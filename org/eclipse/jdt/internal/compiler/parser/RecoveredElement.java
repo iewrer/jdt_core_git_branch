@@ -4,17 +4,18 @@
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
  * http://www.eclipse.org/legal/epl-v10.html
- *
+ * 
  * Contributors:
  *     IBM Corporation - initial API and implementation
  *******************************************************************************/
+
 package org.eclipse.jdt.internal.compiler.parser;
 
 /**
  * Internal structure for parsing recovery
  */
-import org.eclipse.jdt.internal.compiler.ast.AbstractMethodDeclaration;
 import org.eclipse.jdt.internal.compiler.ast.ASTNode;
+import org.eclipse.jdt.internal.compiler.ast.AbstractMethodDeclaration;
 import org.eclipse.jdt.internal.compiler.ast.Block;
 import org.eclipse.jdt.internal.compiler.ast.FieldDeclaration;
 import org.eclipse.jdt.internal.compiler.ast.ImportReference;
@@ -29,6 +30,11 @@ public class RecoveredElement {
 	public int bracketBalance;
 	public boolean foundOpeningBrace;
 	protected Parser recoveringParser;
+	
+	// There is no RecoveredLambdaElement, we just keep track of entry and exit of lambdas via a counter. This allows to prevent certain incorrect mutations of current element.
+	// See https://bugs.eclipse.org/bugs/show_bug.cgi?id=430667.
+	public int lambdaNestLevel;
+	
 public RecoveredElement(RecoveredElement parent, int bracketBalance){
 	this(parent, bracketBalance, null);
 }

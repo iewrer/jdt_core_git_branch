@@ -1,11 +1,10 @@
 /*******************************************************************************
- * Copyright (c) 2000, 2009 IBM Corporation and others.
+ * Copyright (c) 2000, 2013 IBM Corporation and others.
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
  * http://www.eclipse.org/legal/epl-v10.html
- *
- * Contributors:
+ *Contributors:
  *     IBM Corporation - initial API and implementation
  *******************************************************************************/
 package org.eclipse.jdt.internal.compiler.parser;
@@ -25,6 +24,7 @@ import org.eclipse.jdt.internal.compiler.ast.TypeDeclaration;
 import org.eclipse.jdt.internal.compiler.classfmt.ClassFileConstants;
 import org.eclipse.jdt.internal.compiler.lookup.TypeBinding;
 
+@SuppressWarnings("rawtypes")
 public class RecoveredBlock extends RecoveredStatement implements TerminalTokens {
 
 	public Block blockDeclaration;
@@ -94,6 +94,9 @@ public RecoveredElement add(LocalDeclaration localDeclaration, int bracketBalanc
  */
 public RecoveredElement add(LocalDeclaration localDeclaration, int bracketBalanceValue, boolean delegatedByParent) {
 
+	if (localDeclaration.isRecoveredFromLoneIdentifier()) {
+		return this; // skip, the local will be mutated into an assignment and added later, see Parser.consumeLocalVariableDeclarationStatement
+	}
 	/* local variables inside method can only be final and non void */
 /*
 	char[][] localTypeName;
@@ -150,6 +153,7 @@ public RecoveredElement add(Statement stmt, int bracketBalanceValue) {
  * Record a statement declaration
  */
 public RecoveredElement add(Statement stmt, int bracketBalanceValue, boolean delegatedByParent) {
+	
 	resetPendingModifiers();
 
 	/* do not consider a nested block starting passed the block end (if set)
@@ -283,7 +287,7 @@ public Block updatedBlock(int depth, Set knownTypes){
 
 	// if block was not marked to be preserved or empty, then ignore it
 	if (!this.preserveContent || this.statementCount == 0) return null;
-
+	
 	Statement[] updatedStatements = new Statement[this.statementCount];
 	int updatedCount = 0;
 
@@ -324,11 +328,21 @@ public Block updatedBlock(int depth, Set knownTypes){
 	int lastEnd = this.blockDeclaration.sourceStart;
 
 	// only collect the non-null updated statements
+	next:
 	for (int i = 0; i < this.statementCount; i++){
 		Statement updatedStatement = this.statements[i].updatedStatement(depth, knownTypes);
-		if (updatedStatement != null){
+		if (updatedStatement != null) {
+			for (int j = 0; j < i; j++) {
+				if (updatedStatements[j] instanceof LocalDeclaration) {
+					LocalDeclaration local = (LocalDeclaration) updatedStatements[j];
+					if (local.initialization != null) {
+						if (updatedStatement.sourceStart >= local.initialization.sourceStart && updatedStatement.sourceEnd <= local.initialization.sourceEnd)
+							continue next;
+					}
+				}
+			}
 			updatedStatements[updatedCount++] = updatedStatement;
-
+			
 			if (updatedStatement instanceof LocalDeclaration) {
 				LocalDeclaration localDeclaration = (LocalDeclaration) updatedStatement;
 				if(localDeclaration.declarationSourceEnd > lastEnd) {
@@ -412,37 +426,6 @@ public void updateParseTree(){
 
 	updatedBlock(0, new HashSet());
 }
-/*
- * Rebuild a flattened block from the nested structure which is in scope
- */
-public Statement updateStatement(int depth, Set knownTypes){
-
-	// if block was closed or empty, then ignore it
-	if (this.blockDeclaration.sourceEnd != 0 || this.statementCount == 0) return null;
-
-	Statement[] updatedStatements = new Statement[this.statementCount];
-	int updatedCount = 0;
-
-	// only collect the non-null updated statements
-	for (int i = 0; i < this.statementCount; i++){
-		Statement updatedStatement = this.statements[i].updatedStatement(depth, knownTypes);
-		if (updatedStatement != null){
-			updatedStatements[updatedCount++] = updatedStatement;
-		}
-	}
-	if (updatedCount == 0) return null; // not interesting block
-
-	// resize statement collection if necessary
-	if (updatedCount != this.statementCount){
-		this.blockDeclaration.statements = new Statement[updatedCount];
-		System.arraycopy(updatedStatements, 0, this.blockDeclaration.statements, 0, updatedCount);
-	} else {
-		this.blockDeclaration.statements = updatedStatements;
-	}
-
-	return this.blockDeclaration;
-}
-
 /*
  * Record a field declaration
  */

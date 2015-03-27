@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 2000, 2011 IBM Corporation and others.
+ * Copyright (c) 2000, 2013 IBM Corporation and others.
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
@@ -7,7 +7,9 @@
  *
  * Contributors:
  *     IBM Corporation - initial API and implementation
- *     Stephan Herrmann - Contribution for Bug 366003 - CCE in ASTNode.resolveAnnotations(ASTNode.java:639)
+ *     Stephan Herrmann - Contributions for
+ *								bug 366003 - CCE in ASTNode.resolveAnnotations(ASTNode.java:639)
+ *								bug 383973 - [1.8][compiler] syntax recovery in the presence of default methods
  *******************************************************************************/
 package org.eclipse.jdt.internal.compiler.parser;
 
@@ -32,6 +34,7 @@ import org.eclipse.jdt.internal.compiler.classfmt.ClassFileConstants;
  * Internal type structure for parsing recovery
  */
 
+@SuppressWarnings({"rawtypes", "unchecked"})
 public class RecoveredType extends RecoveredStatement implements TerminalTokens {
 	public static final int MAX_TYPE_DEPTH = 256;
 	
@@ -112,7 +115,7 @@ public RecoveredElement add(AbstractMethodDeclaration methodDeclaration, int bra
 		this.pendingTypeParameters = null;
 	}
 
-	if(this.pendingAnnotationCount > 0) {
+	if(this.pendingAnnotationCount > 0 || this.pendingModifiers != 0) {
 		element.attach(
 				this.pendingAnnotations,
 				this.pendingAnnotationCount,
@@ -576,12 +579,20 @@ public TypeDeclaration updatedTypeDeclaration(int depth, Set knownTypes){
 			this.methods[this.methodCount - 1].methodDeclaration.declarationSourceEnd = bodyEndValue;
 			this.methods[this.methodCount - 1].methodDeclaration.bodyEnd = bodyEndValue;
 		}
+		int totalMethods = existingCount;
+		next:
 		for (int i = 0; i < this.methodCount; i++){
+			for (int j = 0; j < existingCount; j++) {
+				if (methodDeclarations[j] == this.methods[i].methodDeclaration)
+					continue next;
+			}
 			AbstractMethodDeclaration updatedMethod = this.methods[i].updatedMethodDeclaration(depth, knownTypes);
 			if (updatedMethod.isConstructor()) hasRecoveredConstructor = true;
 			if (updatedMethod.isAbstract()) hasAbstractMethods = true;
-			methodDeclarations[existingCount + i] = updatedMethod;
+			methodDeclarations[totalMethods ++] = updatedMethod;
 		}
+		if (totalMethods != methodDeclarations.length)
+			System.arraycopy(methodDeclarations, 0, methodDeclarations = new AbstractMethodDeclaration[totalMethods], 0, totalMethods);
 		this.typeDeclaration.methods = methodDeclarations;
 		if(methodDeclarations[methodDeclarations.length - 1].declarationSourceEnd > lastEnd) {
 			lastEnd = methodDeclarations[methodDeclarations.length - 1].declarationSourceEnd;

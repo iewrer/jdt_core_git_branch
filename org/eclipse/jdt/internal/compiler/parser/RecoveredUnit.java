@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 2000, 2009 IBM Corporation and others.
+ * Copyright (c) 2000, 2013 IBM Corporation and others.
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
@@ -25,6 +25,7 @@ import org.eclipse.jdt.internal.compiler.ast.ImportReference;
 import org.eclipse.jdt.internal.compiler.ast.Initializer;
 import org.eclipse.jdt.internal.compiler.ast.TypeDeclaration;
 
+@SuppressWarnings("rawtypes")
 public class RecoveredUnit extends RecoveredElement {
 
 	public CompilationUnitDeclaration unitDeclaration;
@@ -91,7 +92,9 @@ public RecoveredElement add(AbstractMethodDeclaration methodDeclaration, int bra
 				kind != TypeDeclaration.INTERFACE_DECL &&
 				kind != TypeDeclaration.ANNOTATION_TYPE_DECL) {
 			// the } of the last type can be considered as the end of an initializer
-			Initializer initializer = new Initializer(new Block(0), 0);
+			Block block = new Block(0);
+			block.sourceStart = block.sourceEnd = end;
+			Initializer initializer = new Initializer(block, 0);
 			initializer.bodyStart = end;
 			initializer.bodyEnd = end;
 			initializer.declarationSourceStart = end;

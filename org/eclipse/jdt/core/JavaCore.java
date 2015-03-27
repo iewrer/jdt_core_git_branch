@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 2000, 2013 IBM Corporation and others.
+ * Copyright (c) 2000, 2014 IBM Corporation and others.
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
@@ -98,6 +98,11 @@
  *									COMPILER_INHERIT_NULL_ANNOTATIONS
  *									COMPILER_PB_NONNULL_PARAMETER_ANNOTATION_DROPPED
  *									COMPILER_PB_SYNTACTIC_NULL_ANALYSIS_FOR_FIELDS
+ *     Jesper S Moller   - Contributions for bug 381345 : [1.8] Take care of the Java 8 major version
+ *                       - added the following constants:
+ *									COMPILER_CODEGEN_METHOD_PARAMETERS_ATTR
+ *     Harry Terkelsen (het@google.com) - Bug 449262 - Allow the use of third-party Java formatters
+ *     
  *******************************************************************************/
 
 package org.eclipse.jdt.core;
@@ -169,6 +174,7 @@ import org.osgi.framework.BundleContext;
  * </p>
  * @noinstantiate This class is not intended to be instantiated by clients.
  */
+@SuppressWarnings({ "unchecked", "rawtypes" })
 public final class JavaCore extends Plugin {
 
 	private static final IResource[] NO_GENERATED_RESOURCES = new IResource[0];
@@ -266,18 +272,34 @@ public final class JavaCore extends Plugin {
 	 */
 	public static final String COMPILER_CODEGEN_UNUSED_LOCAL = PLUGIN_ID + ".compiler.codegen.unusedLocal"; //$NON-NLS-1$
 	/**
+	 * Compiler option ID: Generating Method Parameters Attribute.
+	 * <p>When generated, this attribute will enable information about the formal parameters of a method
+	 * (such as their names) to be accessed from reflection libraries, annotation processing,
+	 * code weaving, and in the debugger, from platform target level 1.8 and later.</p>
+	 * <dl>
+	 * <dt>Option id:</dt><dd><code>"org.eclipse.jdt.core.compiler.codegen.methodParameters"</code></dd>
+	 * <dt>Possible values:</dt><dd><code>{ "generate", "do not generate" }</code></dd>
+	 * <dt>Default:</dt><dd><code>"do not generate"</code></dd>
+	 * </dl>
+	 * @since 3.10
+	 * @category CompilerOptionID
+	 */
+	public static final String COMPILER_CODEGEN_METHOD_PARAMETERS_ATTR = PLUGIN_ID + ".compiler.codegen.methodParameters"; //$NON-NLS-1$
+	/**
 	 * Compiler option ID: Defining Target Java Platform.
-	 * <p>For binary compatibility reason, .class files can be tagged to with certain VM versions and later.</p>
-	 * <p>Note that <code>"1.4"</code> target requires to toggle compliance mode to <code>"1.4"</code>, <code>"1.5"</code> target requires
-	 *    to toggle compliance mode to <code>"1.5"</code>, <code>"1.6"</code> target requires to toggle compliance mode to <code>"1.6"</code> and
-	 *    <code>"1.7"</code> target requires to toggle compliance mode to <code>"1.7"</code>.
-	 *    <code>"cldc1.1"</code> requires the source version to be <code>"1.3"</code> and the compliance version to be <code>"1.4"</code> or lower.</p>
+	 * <p>For binary compatibility reasons, .class files are tagged with a minimal required VM version.</p>
+	 * <p>Note that <code>"1.4"</code> and higher target versions require the compliance mode to be at least as high
+	 *    as the target version. Usually, compliance, target, and source versions are set to the same values.</p>
+	 * <p><code>"cldc1.1"</code> requires the source version to be <code>"1.3"</code> and the compliance version to be <code>"1.4"</code> or lower.</p>
 	 * <dl>
 	 * <dt>Option id:</dt><dd><code>"org.eclipse.jdt.core.compiler.codegen.targetPlatform"</code></dd>
-	 * <dt>Possible values:</dt><dd><code>{ "1.1", "1.2", "1.3", "1.4", "1.5", "1.6", "1.7", "cldc1.1" }</code></dd>
+	 * <dt>Possible values:</dt><dd><code>{ "1.1", "1.2", "1.3", "1.4", "1.5", "1.6", "1.7", "1.8", "cldc1.1" }</code></dd>
 	 * <dt>Default:</dt><dd><code>"1.2"</code></dd>
 	 * </dl>
 	 * @category CompilerOptionID
+	 * @see #COMPILER_COMPLIANCE
+	 * @see #COMPILER_SOURCE
+	 * @see #setComplianceOptions(String, Map)
 	 */
 	public static final String COMPILER_CODEGEN_TARGET_PLATFORM = PLUGIN_ID + ".compiler.codegen.targetPlatform"; //$NON-NLS-1$
 	/**
@@ -431,6 +453,19 @@ public final class JavaCore extends Plugin {
 	 * @category CompilerOptionID
 	 */
 	public static final String COMPILER_PB_UNUSED_PARAMETER = PLUGIN_ID + ".compiler.problem.unusedParameter"; //$NON-NLS-1$
+	/**
+	 * Compiler option ID: Reporting Unused Exception Parameter.
+	 * <p>When enabled, the compiler will issue an error or a warning for unused exception
+	 *    parameters (that is, the thrown exception is never read from).</p>
+	 * <dl>
+	 * <dt>Option id:</dt><dd><code>"org.eclipse.jdt.core.compiler.problem.unusedExceptionParameter"</code></dd>
+	 * <dt>Possible values:</dt><dd><code>{ "error", "warning", "ignore" }</code></dd>
+	 * <dt>Default:</dt><dd><code>"ignore"</code></dd>
+	 * </dl>
+	 * @category CompilerOptionID
+	 * @since 3.11
+	 */
+	public static final String COMPILER_PB_UNUSED_EXCEPTION_PARAMETER = PLUGIN_ID + ".compiler.problem.unusedExceptionParameter"; //$NON-NLS-1$
 	/**
 	 * Compiler option ID: Reporting Unused Parameter if Implementing Abstract Method.
 	 * <p>When enabled, the compiler will signal unused parameters in abstract method implementations.</p>
@@ -927,9 +962,10 @@ public final class JavaCore extends Plugin {
 	 */
 	public static final String COMPILER_PB_RAW_TYPE_REFERENCE = PLUGIN_ID + ".compiler.problem.rawTypeReference"; //$NON-NLS-1$
 	/**
-	 * Compiler option ID: Reporting of Unavoidable Generic Type Problems.
-	 * <p> When enabled, the compiler will issue an error or warning even when it detects a generic type problem
-	 *     that could not have been avoided by the programmer. As an example, a type may be forced to use raw types
+	 * Compiler option ID: Reporting of Unavoidable Generic Type Problems due to raw APIs.
+	 * <p> When enabled, the compiler will issue an error or warning even when it detects a generics-related type problem
+	 *     that could not have been avoided by the programmer, because a referenced API already contains raw types.
+	 *     As an example, a type may be forced to use raw types
 	 *     in its method signatures and return types because the methods it overrides from a super type are declared to
 	 *     use raw types in the first place.</p>
 	 * <dl>
@@ -1754,32 +1790,37 @@ public final class JavaCore extends Plugin {
 	 *    reserved for assertion support. Also note, than when toggling to 1.4 mode, the target VM
 	 *    level should be set to <code>"1.4"</code> and the compliance mode should be <code>"1.4"</code>.</p>
 	 * <p>Source level 1.5 is necessary to enable generics, autoboxing, covariance, annotations, enumerations
-	 *    enhanced for loop, static imports and varargs. Once toggled, the target VM level should be set to <code>"1.5"</code>
-	 *    and the compliance mode should be <code>"1.5"</code>.</p>
-	 * <p>Source level 1.6 is necessary to enable the computation of stack map tables. Once toggled, the target
-	 *    VM level should be set to <code>"1.6"</code> and the compliance mode should be <code>"1.6"</code>.</p>
-	 * <p>Once the source level 1.7 is toggled, the target VM level should be set to <code>"1.7"</code> and the compliance mode
-	 *    should be <code>"1.7"</code>.</p>
+	 *    enhanced for loop, static imports and varargs.</p>
+	 * <p>In source levels <code>"1.5"</code> and higher, the compliance and target settings should be
+	 *    set to the same version as the source level.</p>
 	 * <dl>
 	 * <dt>Option id:</dt><dd><code>"org.eclipse.jdt.core.compiler.source"</code></dd>
-	 * <dt>Possible values:</dt><dd><code>{ "1.3", "1.4", "1.5", "1.6", "1.7" }</code></dd>
+	 * <dt>Possible values:</dt><dd><code>{ "1.3", "1.4", "1.5", "1.6", "1.7", "1.8" }</code></dd>
 	 * <dt>Default:</dt><dd><code>"1.3"</code></dd>
 	 * </dl>
 	 * @since 2.0
 	 * @category CompilerOptionID
+	 * @see #COMPILER_COMPLIANCE
+	 * @see #COMPILER_CODEGEN_TARGET_PLATFORM
+	 * @see #setComplianceOptions(String, Map)
 	 */
 	public static final String COMPILER_SOURCE = PLUGIN_ID + ".compiler.source"; //$NON-NLS-1$
 	/**
 	 * Compiler option ID: Setting Compliance Level.
-	 * <p>Select the compliance level for the compiler. In <code>"1.3"</code> mode, source and target settings
-	 *    should not go beyond <code>"1.3"</code> level.</p>
+	 * <p>Select the compliance level for the compiler.
+	 *    {@link #COMPILER_SOURCE} and {@link #COMPILER_CODEGEN_TARGET_PLATFORM} settings cannot be
+	 *    higher than the compiler compliance level. In <code>"1.5"</code> and higher compliance, source and target settings
+	 *    should match the compliance setting.</p>
 	 * <dl>
 	 * <dt>Option id:</dt><dd><code>"org.eclipse.jdt.core.compiler.compliance"</code></dd>
-	 * <dt>Possible values:</dt><dd><code>{ "1.3", "1.4", "1.5", "1.6", "1.7" }</code></dd>
+	 * <dt>Possible values:</dt><dd><code>{ "1.3", "1.4", "1.5", "1.6", "1.7", "1.8" }</code></dd>
 	 * <dt>Default:</dt><dd><code>"1.4"</code></dd>
 	 * </dl>
 	 * @since 2.0
 	 * @category CompilerOptionID
+	 * @see #COMPILER_SOURCE
+	 * @see #COMPILER_CODEGEN_TARGET_PLATFORM
+	 * @see #setComplianceOptions(String, Map)
 	 */
 	public static final String COMPILER_COMPLIANCE = PLUGIN_ID + ".compiler.compliance"; //$NON-NLS-1$
 	/**
@@ -2248,6 +2289,19 @@ public final class JavaCore extends Plugin {
 	public static final String TIMEOUT_FOR_PARAMETER_NAME_FROM_ATTACHED_JAVADOC = PLUGIN_ID + ".timeoutForParameterNameFromAttachedJavadoc"; //$NON-NLS-1$
 
 	/**
+	 * Core option ID: The ID of the formatter to use in formatting operations.
+	 * <dl>
+	 * <dt>Option id:</dt><dd><code>"org.eclipse.jdt.core.javaFormatter"</code></dd>
+	 * <dt>Default:</dt><dd><code>"org.eclipse.jdt.core.defaultJavaFormatter"</code></dd>
+	 * </dl>
+	 * @see #DEFAULT_JAVA_FORMATTER
+	 * @see #JAVA_FORMATTER_EXTENSION_POINT_ID
+	 * @since 3.11
+	 * @category CoreOptionID
+	 */
+	public static final String JAVA_FORMATTER = PLUGIN_ID + ".javaFormatter"; //$NON-NLS-1$
+
+	/**
 	 * @since 2.0
 	 * @deprecated Use {@link org.eclipse.jdt.core.formatter.DefaultCodeFormatterConstants#FORMATTER_BRACE_POSITION_FOR_ANONYMOUS_TYPE_DECLARATION},
 	 * {@link org.eclipse.jdt.core.formatter.DefaultCodeFormatterConstants#FORMATTER_BRACE_POSITION_FOR_BLOCK} ,
@@ -2641,6 +2695,12 @@ public final class JavaCore extends Plugin {
 	public static final String VERSION_1_7 = "1.7"; //$NON-NLS-1$
 	/**
 	 * Configurable option value: {@value}.
+	 * @since 3.10
+	 * @category OptionValue
+	 */
+	public static final String VERSION_1_8 = "1.8"; //$NON-NLS-1$
+	/**
+	 * Configurable option value: {@value}.
 	 * @since 3.4
 	 * @category OptionValue
 	 */
@@ -2796,6 +2856,23 @@ public final class JavaCore extends Plugin {
 	 * @since 3.2
 	 */
 	public static final String JAVA_SOURCE_CONTENT_TYPE = JavaCore.PLUGIN_ID+".javaSource" ; //$NON-NLS-1$
+
+	/**
+	 * The ID of the Eclipse built-in formatter.
+	 *
+	 * @see #JAVA_FORMATTER
+	 * @see #JAVA_FORMATTER_EXTENSION_POINT_ID
+	 * @since 3.11
+	 */
+	public static final String DEFAULT_JAVA_FORMATTER = PLUGIN_ID + ".defaultJavaFormatter"; //$NON-NLS-1$
+
+	/**
+	 * Name of the extension point for contributing a source code formatter
+	 * @see #JAVA_FORMATTER
+	 * @see #DEFAULT_JAVA_FORMATTER
+	 * @since 3.11
+	 */
+	public static final String JAVA_FORMATTER_EXTENSION_POINT_ID = "javaFormatter" ;  //$NON-NLS-1$
 
 	/**
 	 * Creates the Java core plug-in.
@@ -5517,7 +5594,7 @@ public final class JavaCore extends Plugin {
 	 *
 	 * <p>If the given compliance is unknown, the given map is unmodified.</p>
 	 *
-	 * @param compliance the given compliance
+	 * @param compliance the given {@link #COMPILER_COMPLIANCE compliance}
 	 * @param options the given options map
 	 * @since 3.3
 	 */
@@ -5560,6 +5637,15 @@ public final class JavaCore extends Plugin {
 				options.put(JavaCore.COMPILER_PB_ASSERT_IDENTIFIER, JavaCore.ERROR);
 				options.put(JavaCore.COMPILER_PB_ENUM_IDENTIFIER, JavaCore.ERROR);
 				options.put(JavaCore.COMPILER_CODEGEN_INLINE_JSR_BYTECODE, JavaCore.ENABLED);
+				break;
+			case ClassFileConstants.MAJOR_VERSION_1_8:
+				options.put(JavaCore.COMPILER_COMPLIANCE, JavaCore.VERSION_1_8);
+				options.put(JavaCore.COMPILER_SOURCE, JavaCore.VERSION_1_8);
+				options.put(JavaCore.COMPILER_CODEGEN_TARGET_PLATFORM, JavaCore.VERSION_1_8);
+				options.put(JavaCore.COMPILER_PB_ASSERT_IDENTIFIER, JavaCore.ERROR);
+				options.put(JavaCore.COMPILER_PB_ENUM_IDENTIFIER, JavaCore.ERROR);
+				options.put(JavaCore.COMPILER_CODEGEN_INLINE_JSR_BYTECODE, JavaCore.ENABLED);
+				break;
 		}
 	}
 
@@ -5595,6 +5681,7 @@ public final class JavaCore extends Plugin {
 	 */
 	public void stop(BundleContext context) throws Exception {
 		try {
+			JavaModelManager.unregisterDebugOptionsListener();
 			JavaModelManager.getJavaModelManager().shutdown();
 		} finally {
 			// ensure we call super.stop as the last thing
@@ -5613,6 +5700,7 @@ public final class JavaCore extends Plugin {
 	 */
 	public void start(BundleContext context) throws Exception {
 		super.start(context);
+		JavaModelManager.registerDebugOptionsListener(context);
 		JavaModelManager.getJavaModelManager().startup();
 	}
 }

@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 2000, 2013 IBM Corporation and others.
+ * Copyright (c) 2000, 2014 IBM Corporation and others.
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
@@ -14,8 +14,23 @@
  *								bug 370639 - [compiler][resource] restore the default for resource leak warnings
  *								bug 388996 - [compiler][resource] Incorrect 'potential resource leak'
  *								bug 403147 - [compiler][null] FUP of bug 400761: consolidate interaction between unboxing, NPE, and deferred checking
+ *								Bug 400874 - [1.8][compiler] Inference infrastructure should evolve to meet JLS8 18.x (Part G of JSR335 spec)
+ *								Bug 424710 - [1.8][compiler] CCE in SingleNameReference.localVariableBinding
+ *								Bug 425152 - [1.8] [compiler] Lambda Expression not resolved but flow analyzed leading to NPE.
+ *								Bug 424205 - [1.8] Cannot infer type for diamond type with lambda on method invocation
+ *								Bug 424415 - [1.8][compiler] Eventual resolution of ReferenceExpression is not seen to be happening.
+ *								Bug 426366 - [1.8][compiler] Type inference doesn't handle multiple candidate target types in outer overload context
+ *								Bug 426290 - [1.8][compiler] Inference + overloading => wrong method resolution ?
+ *								Bug 427483 - [Java 8] Variables in lambdas sometimes can't be resolved
+ *								Bug 427438 - [1.8][compiler] NPE at org.eclipse.jdt.internal.compiler.ast.ConditionalExpression.generateCode(ConditionalExpression.java:280)
+ *								Bug 428352 - [1.8][compiler] Resolution errors don't always surface
+ *								Bug 452788 - [1.8][compiler] Type not correctly inferred in lambda expression
+ *        Andy Clement (GoPivotal, Inc) aclement@gopivotal.com - Contributions for
+ *                          Bug 409245 - [1.8][compiler] Type annotations dropped when call is routed through a synthetic bridge method
  *******************************************************************************/
 package org.eclipse.jdt.internal.compiler.ast;
+
+import static org.eclipse.jdt.internal.compiler.ast.ExpressionContext.INVOCATION_CONTEXT;
 
 import org.eclipse.jdt.internal.compiler.ASTVisitor;
 import org.eclipse.jdt.internal.compiler.classfmt.ClassFileConstants;
@@ -26,13 +41,16 @@ import org.eclipse.jdt.internal.compiler.flow.FlowInfo;
 import org.eclipse.jdt.internal.compiler.lookup.Binding;
 import org.eclipse.jdt.internal.compiler.lookup.BlockScope;
 import org.eclipse.jdt.internal.compiler.lookup.ExtraCompilerModifiers;
-import org.eclipse.jdt.internal.compiler.lookup.InvocationSite;
+import org.eclipse.jdt.internal.compiler.lookup.InferenceContext18;
 import org.eclipse.jdt.internal.compiler.lookup.LocalTypeBinding;
 import org.eclipse.jdt.internal.compiler.lookup.MethodBinding;
 import org.eclipse.jdt.internal.compiler.lookup.MethodScope;
+import org.eclipse.jdt.internal.compiler.lookup.ParameterizedGenericMethodBinding;
+import org.eclipse.jdt.internal.compiler.lookup.ParameterizedMethodBinding;
 import org.eclipse.jdt.internal.compiler.lookup.ProblemMethodBinding;
 import org.eclipse.jdt.internal.compiler.lookup.RawTypeBinding;
 import org.eclipse.jdt.internal.compiler.lookup.ReferenceBinding;
+import org.eclipse.jdt.internal.compiler.lookup.Scope;
 import org.eclipse.jdt.internal.compiler.lookup.SourceTypeBinding;
 import org.eclipse.jdt.internal.compiler.lookup.TagBits;
 import org.eclipse.jdt.internal.compiler.lookup.TypeBinding;
@@ -40,7 +58,7 @@ import org.eclipse.jdt.internal.compiler.lookup.TypeConstants;
 import org.eclipse.jdt.internal.compiler.lookup.TypeIds;
 import org.eclipse.jdt.internal.compiler.lookup.VariableBinding;
 
-public class ExplicitConstructorCall extends Statement implements InvocationSite {
+public class ExplicitConstructorCall extends Statement implements Invocation {
 
 	public Expression[] arguments;
 	public Expression qualification;
@@ -167,9 +185,9 @@ public class ExplicitConstructorCall extends Statement implements InvocationSite
 					i++) {
 					codeStream.aconst_null();
 				}
-				codeStream.invoke(Opcodes.OPC_invokespecial, this.syntheticAccessor, null /* default declaringClass */);
+				codeStream.invoke(Opcodes.OPC_invokespecial, this.syntheticAccessor, null /* default declaringClass */, this.typeArguments);
 			} else {
-				codeStream.invoke(Opcodes.OPC_invokespecial, codegenBinding, null /* default declaringClass */);
+				codeStream.invoke(Opcodes.OPC_invokespecial, codegenBinding, null /* default declaringClass */, this.typeArguments);
 			}
 			codeStream.recordPositionsFrom(pc, this.sourceStart);
 		} finally {
@@ -332,8 +350,9 @@ public class ExplicitConstructorCall extends Statement implements InvocationSite
 				}
 			}
 			// resolve type arguments (for generic constructor call)
+			long sourceLevel = scope.compilerOptions().sourceLevel;
 			if (this.typeArguments != null) {
-				boolean argHasError = scope.compilerOptions().sourceLevel < ClassFileConstants.JDK1_5;
+				boolean argHasError = sourceLevel < ClassFileConstants.JDK1_5;
 				int length = this.typeArguments.length;
 				this.genericTypeArguments = new TypeBinding[length];
 				for (int i = 0; i < length; i++) {
@@ -367,6 +386,7 @@ public class ExplicitConstructorCall extends Statement implements InvocationSite
 						argument.bits |= ASTNode.DisableUnnecessaryCastCheck; // will check later on
 						argsContainCast = true;
 					}
+					argument.setExpressionContext(INVOCATION_CONTEXT);
 					if ((argumentTypes[i] = argument.resolveType(scope)) == null) {
 						argHasError = true;
 					}
@@ -380,7 +400,7 @@ public class ExplicitConstructorCall extends Statement implements InvocationSite
 					for (int i = length; --i >= 0;) {
 						pseudoArgs[i] = argumentTypes[i] == null ? TypeBinding.NULL : argumentTypes[i]; // replace args with errors with null type
 					}
-					this.binding = scope.findMethod(receiverType, TypeConstants.INIT, pseudoArgs, this);
+					this.binding = scope.findMethod(receiverType, TypeConstants.INIT, pseudoArgs, this, false);
 					if (this.binding != null && !this.binding.isValidBinding()) {
 						MethodBinding closestMatch = ((ProblemMethodBinding)this.binding).closestMatch;
 						// record the closest match, for clients who may still need hint about possible method match
@@ -406,7 +426,9 @@ public class ExplicitConstructorCall extends Statement implements InvocationSite
 			if (receiverType == null) {
 				return;
 			}
-			if ((this.binding = scope.getConstructor(receiverType, argumentTypes, this)).isValidBinding()) {
+			this.binding = findConstructorBinding(scope, this, receiverType, argumentTypes);
+
+			if (this.binding.isValidBinding()) {
 				if ((this.binding.tagBits & TagBits.HasMissingType) != 0) {
 					if (!methodScope.enclosingSourceType().isAnonymousType()) {
 						scope.problemReporter().missingTypeInConstructor(this, this.binding);
@@ -466,5 +488,31 @@ public class ExplicitConstructorCall extends Statement implements InvocationSite
 			}
 		}
 		visitor.endVisit(this, scope);
+	}
+
+	// -- interface Invocation
+	public MethodBinding binding() {
+		return this.binding;
+	}
+
+	public void registerInferenceContext(ParameterizedGenericMethodBinding method, InferenceContext18 infCtx18) {
+		// Nothing to do.
+	}
+	
+	@Override
+	public void registerResult(TypeBinding targetType, MethodBinding method) {
+		// Nothing to do.
+	}
+	
+	public InferenceContext18 getInferenceContext(ParameterizedMethodBinding method) {
+		return null;
+	}
+	
+	public Expression[] arguments() {
+		return this.arguments;
+	}
+	// -- interface InvocationSite: --
+	public InferenceContext18 freshInferenceContext(Scope scope) {
+		return new InferenceContext18(scope, this.arguments, this, null);
 	}
 }

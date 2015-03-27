@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 2000, 2012 IBM Corporation and others.
+ * Copyright (c) 2000, 2014 IBM Corporation and others.
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
@@ -34,6 +34,7 @@ import org.eclipse.jdt.internal.core.util.Messages;
  * @see IType
  */
 
+@SuppressWarnings({ "rawtypes", "unchecked" })
 public class SourceType extends NamedMember implements IType {
 
 /*
@@ -180,6 +181,8 @@ public IType createType(String contents, IJavaElement sibling, boolean force, IP
 }
 public boolean equals(Object o) {
 	if (!(o instanceof SourceType)) return false;
+	if (((SourceType) o).isLambda()) 
+		return false;
 	return super.equals(o);
 }
 /*
@@ -335,6 +338,7 @@ public IJavaElement getHandleFromMemento(String token, MementoTokenizer memento,
 			params.toArray(parameters);
 			JavaElement method = (JavaElement)getMethod(selector, parameters);
 			switch (token.charAt(0)) {
+				case JEM_LAMBDA_EXPRESSION:
 				case JEM_TYPE:
 				case JEM_TYPE_PARAMETER:
 				case JEM_LOCALVARIABLE:
@@ -839,8 +843,7 @@ public JavaElement resolved(Binding binding) {
 protected void toStringInfo(int tab, StringBuffer buffer, Object info, boolean showResolvedInfo) {
 	buffer.append(tabString(tab));
 	if (info == null) {
-		String elementName = getElementName();
-		if (elementName.length() == 0) {
+		if (isAnonymous()) {
 			buffer.append("<anonymous #"); //$NON-NLS-1$
 			buffer.append(this.occurrenceCount);
 			buffer.append(">"); //$NON-NLS-1$
@@ -849,8 +852,7 @@ protected void toStringInfo(int tab, StringBuffer buffer, Object info, boolean s
 		}
 		buffer.append(" (not open)"); //$NON-NLS-1$
 	} else if (info == NO_INFO) {
-		String elementName = getElementName();
-		if (elementName.length() == 0) {
+		if (isAnonymous()) {
 			buffer.append("<anonymous #"); //$NON-NLS-1$
 			buffer.append(this.occurrenceCount);
 			buffer.append(">"); //$NON-NLS-1$
@@ -868,8 +870,7 @@ protected void toStringInfo(int tab, StringBuffer buffer, Object info, boolean s
 			} else {
 				buffer.append("class "); //$NON-NLS-1$
 			}
-			String elementName = getElementName();
-			if (elementName.length() == 0) {
+			if (isAnonymous()) {
 				buffer.append("<anonymous #"); //$NON-NLS-1$
 				buffer.append(this.occurrenceCount);
 				buffer.append(">"); //$NON-NLS-1$
@@ -880,5 +881,9 @@ protected void toStringInfo(int tab, StringBuffer buffer, Object info, boolean s
 			buffer.append("<JavaModelException in toString of " + getElementName()); //$NON-NLS-1$
 		}
 	}
+}
+@Override
+public boolean isLambda() {
+	return false;
 }
 }

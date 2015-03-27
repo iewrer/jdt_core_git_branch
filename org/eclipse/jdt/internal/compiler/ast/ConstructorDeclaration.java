@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 2000, 2013 IBM Corporation and others.
+ * Copyright (c) 2000, 2014 IBM Corporation and others.
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
@@ -17,13 +17,20 @@
  *								bug 331649 - [compiler][null] consider null annotations for fields
  *								bug 383368 - [compiler][null] syntactic null analysis for field references
  *								bug 400421 - [compiler] Null analysis for fields does not take @com.google.inject.Inject into account
+ *								Bug 392099 - [1.8][compiler][null] Apply null annotation on types for null analysis
+ *								Bug 416176 - [1.8][compiler][null] null type annotations cause grief on type variables
+ *								Bug 435805 - [1.8][compiler][null] Java 8 compiler does not recognize declaration style null annotations
+ *        Andy Clement (GoPivotal, Inc) aclement@gopivotal.com - Contributions for
+ *                          Bug 415399 - [1.8][compiler] Type annotations on constructor results dropped by the code generator
  *******************************************************************************/
 package org.eclipse.jdt.internal.compiler.ast;
 
 import java.util.ArrayList;
+import java.util.List;
 
 import org.eclipse.jdt.core.compiler.*;
 import org.eclipse.jdt.internal.compiler.*;
+import org.eclipse.jdt.internal.compiler.ast.TypeReference.AnnotationCollector;
 import org.eclipse.jdt.internal.compiler.classfmt.ClassFileConstants;
 import org.eclipse.jdt.internal.compiler.codegen.*;
 import org.eclipse.jdt.internal.compiler.flow.*;
@@ -32,6 +39,7 @@ import org.eclipse.jdt.internal.compiler.parser.*;
 import org.eclipse.jdt.internal.compiler.problem.*;
 import org.eclipse.jdt.internal.compiler.util.Util;
 
+@SuppressWarnings({"rawtypes", "unchecked"})
 public class ConstructorDeclaration extends AbstractMethodDeclaration {
 
 	public ExplicitConstructorCall constructorCall;
@@ -82,6 +90,11 @@ public void analyseCode(ClassScope classScope, InitializationFlowContext initial
 				break checkUnused;
 			if (!methodBinding.canBeSeenBy(SuperReference.implicitSuperConstructorCall(), this.scope))
 				break checkUnused;
+			ReferenceBinding declaringClass = constructorBinding.declaringClass;
+			if (constructorBinding.isPublic() && constructorBinding.parameters.length == 0 &&
+					declaringClass.isStatic() &&
+					declaringClass.findSuperTypeOriginatingFrom(TypeIds.T_JavaIoExternalizable, false) != null)
+				break checkUnused;
 			// otherwise default super constructor exists, so go ahead and complain unused.
 		}
 		// complain unused
@@ -130,7 +143,10 @@ public void analyseCode(ClassScope classScope, InitializationFlowContext initial
 		}
 
 		// nullity and mark as assigned
-		analyseArguments(flowInfo);
+		if (classScope.environment().usesNullTypeAnnotations())
+			analyseArguments18(flowInfo, this.arguments, this.binding);
+		else
+			analyseArguments(flowInfo, this.arguments, this.binding);
 
 		// propagate to constructor call
 		if (this.constructorCall != null) {
@@ -255,6 +271,15 @@ public void generateCode(ClassScope classScope, ClassFile classFile) {
 	}
 	boolean restart = false;
 	boolean abort = false;
+	CompilationResult unitResult = null;
+	int problemCount = 0;
+	if (classScope != null) {
+		TypeDeclaration referenceContext = classScope.referenceContext;
+		if (referenceContext != null) {
+			unitResult = referenceContext.compilationResult();
+			problemCount = unitResult.problemCount;
+		}
+	}
 	do {
 		try {
 			problemResetPC = classFile.contentsOffset;
@@ -266,11 +291,19 @@ public void generateCode(ClassScope classScope, ClassFile classFile) {
 				classFile.contentsOffset = problemResetPC;
 				classFile.methodCount--;
 				classFile.codeStream.resetInWideMode(); // request wide mode
+				// reset the problem count to prevent reporting the same warning twice
+				if (unitResult != null) {
+					unitResult.problemCount = problemCount;
+				}
 				restart = true;
 			} else if (e.compilationResult == CodeStream.RESTART_CODE_GEN_FOR_UNUSED_LOCALS_MODE) {
 				classFile.contentsOffset = problemResetPC;
 				classFile.methodCount--;
 				classFile.codeStream.resetForCodeGenUnusedLocals();
+				// reset the problem count to prevent reporting the same warning twice
+				if (unitResult != null) {
+					unitResult.problemCount = problemCount;
+				}
 				restart = true;
 			} else {
 				restart = false;
@@ -426,6 +459,14 @@ private void internalGenerateCode(ClassScope classScope, ClassFile classFile) {
 	classFile.completeMethodInfo(this.binding, methodAttributeOffset, attributeNumber);
 }
 
+public void getAllAnnotationContexts(int targetType, List allAnnotationContexts) {
+	AnnotationCollector collector = new AnnotationCollector(null, targetType, allAnnotationContexts);
+	for (int i = 0, max = this.annotations.length; i < max; i++) {
+		Annotation annotation = this.annotations[i];
+		annotation.traverse(collector, (BlockScope) null);
+	}
+}
+
 public boolean isConstructor() {
 	return true;
 }
@@ -527,11 +568,7 @@ public void resolveStatements() {
 	if (!CharOperation.equals(sourceType.sourceName, this.selector)){
 		this.scope.problemReporter().missingReturnType(this);
 	}
-	if (this.typeParameters != null) {
-		for (int i = 0, length = this.typeParameters.length; i < length; i++) {
-			this.typeParameters[i].resolve(this.scope);
-		}
-	}
+	// typeParameters are already resolved from Scope#connectTypeVariables()
 	if (this.binding != null && !this.binding.isPrivate()) {
 		sourceType.tagBits |= TagBits.HasNonPrivateConstructor;
 	}

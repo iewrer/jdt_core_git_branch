@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 2000, 2013 IBM Corporation and others.
+ * Copyright (c) 2000, 2014 IBM Corporation and others.
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
@@ -21,6 +21,9 @@
  *								bug 384380 - False positive on a ?? Potential null pointer access ?? after a continue
  *     Jesper Steen Moller - Contributions for
  *								bug 404146 - [1.7][compiler] nested try-catch-finally-blocks leads to unrunnable Java byte code
+ *     Andy Clement (GoPivotal, Inc) aclement@gopivotal.com - Contributions for
+ *                          Bug 383624 - [1.8][compiler] Revive code generation support for type annotations (from Olivier's work)
+ *
  *******************************************************************************/
 package org.eclipse.jdt.internal.compiler.ast;
 
@@ -491,10 +494,10 @@ public void generateCode(BlockScope currentScope, CodeStream codeStream) {
 			ExceptionLabel exceptionLabel = null;
 			if ((argument.binding.tagBits & TagBits.MultiCatchParameter) != 0) {
 				MultiCatchExceptionLabel multiCatchExceptionLabel = new MultiCatchExceptionLabel(codeStream, argument.binding.type);
-				multiCatchExceptionLabel.initialize((UnionTypeReference) argument.type);
+				multiCatchExceptionLabel.initialize((UnionTypeReference) argument.type, argument.annotations);
 				exceptionLabel = multiCatchExceptionLabel;
 			} else {
-				exceptionLabel = new ExceptionLabel(codeStream, argument.binding.type);
+				exceptionLabel = new ExceptionLabel(codeStream, argument.binding.type, argument.type, argument.annotations);
 			}
 			exceptionLabel.placeStart();
 			exceptionLabels[i] = exceptionLabel;
@@ -1055,8 +1058,9 @@ public void resolve(BlockScope upperScope) {
 			this.anyExceptionVariable.setConstant(Constant.NotAConstant); // not inlinable
 
 			if (!methodScope.isInsideInitializer()) {
-				MethodBinding methodBinding =
-					((AbstractMethodDeclaration) methodScope.referenceContext).binding;
+				MethodBinding methodBinding = methodScope.referenceContext instanceof AbstractMethodDeclaration ?
+					((AbstractMethodDeclaration) methodScope.referenceContext).binding : (methodScope.referenceContext instanceof LambdaExpression ? 
+							((LambdaExpression)methodScope.referenceContext).binding : null);
 				if (methodBinding != null) {
 					TypeBinding methodReturnType = methodBinding.returnType;
 					if (methodReturnType.id != TypeIds.T_void) {
@@ -1141,6 +1145,8 @@ protected void verifyDuplicationAndOrder(int length, TypeBinding[] argumentTypes
 		int totalCount = 0;
 		ReferenceBinding[][] allExceptionTypes = new ReferenceBinding[length][];
 		for (int i = 0; i < length; i++) {
+			if (argumentTypes[i] instanceof ArrayBinding)
+				continue;
 			ReferenceBinding currentExceptionType = (ReferenceBinding) argumentTypes[i];
 			TypeReference catchArgumentType = this.catchArguments[i].type;
 			if ((catchArgumentType.bits & ASTNode.IsUnionType) != 0) {
@@ -1161,6 +1167,7 @@ protected void verifyDuplicationAndOrder(int length, TypeBinding[] argumentTypes
 		this.caughtExceptionsCatchBlocks  = new int[totalCount];
 		for (int i = 0, l = 0; i < length; i++) {
 			ReferenceBinding[] currentExceptions = allExceptionTypes[i];
+			if (currentExceptions == null) continue;
 			loop: for (int j = 0, max = currentExceptions.length; j < max; j++) {
 				ReferenceBinding exception = currentExceptions[j];
 				this.caughtExceptionTypes[l] = exception;
@@ -1168,6 +1175,7 @@ protected void verifyDuplicationAndOrder(int length, TypeBinding[] argumentTypes
 				// now iterate over all previous exceptions
 				for (int k = 0; k < i; k++) {
 					ReferenceBinding[] exceptions = allExceptionTypes[k];
+					if (exceptions == null) continue;
 					for (int n = 0, max2 = exceptions.length; n < max2; n++) {
 						ReferenceBinding currentException = exceptions[n];
 						if (exception.isCompatibleWith(currentException)) {
@@ -1188,6 +1196,8 @@ protected void verifyDuplicationAndOrder(int length, TypeBinding[] argumentTypes
 	} else {
 		this.caughtExceptionTypes = new ReferenceBinding[length];
 		for (int i = 0; i < length; i++) {
+			if (argumentTypes[i] instanceof ArrayBinding)
+				continue;
 			this.caughtExceptionTypes[i] = (ReferenceBinding) argumentTypes[i];
 			for (int j = 0; j < i; j++) {
 				if (this.caughtExceptionTypes[i].isCompatibleWith(argumentTypes[j])) {
@@ -1199,5 +1209,35 @@ protected void verifyDuplicationAndOrder(int length, TypeBinding[] argumentTypes
 			}
 		}
 	}
+}
+@Override
+public boolean doesNotCompleteNormally() {
+	if (!this.tryBlock.doesNotCompleteNormally()) {
+		return (this.finallyBlock != null) ? this.finallyBlock.doesNotCompleteNormally() : false;
+	}
+	if (this.catchBlocks != null) {
+		for (int i = 0; i < this.catchBlocks.length; i++) {
+			if (!this.catchBlocks[i].doesNotCompleteNormally()) {
+				return (this.finallyBlock != null) ? this.finallyBlock.doesNotCompleteNormally() : false;
+			}
+		}
+	}
+	return true;
+}
+@Override
+public boolean completesByContinue() {
+	if (this.tryBlock.completesByContinue()) {
+		return (this.finallyBlock == null) ? true :
+			!this.finallyBlock.doesNotCompleteNormally() || this.finallyBlock.completesByContinue(); 
+	}
+	if (this.catchBlocks != null) {
+		for (int i = 0; i < this.catchBlocks.length; i++) {
+			if (this.catchBlocks[i].completesByContinue()) {
+				return (this.finallyBlock == null) ? true :
+					!this.finallyBlock.doesNotCompleteNormally() || this.finallyBlock.completesByContinue();
+			}
+		}
+	}
+	return this.finallyBlock != null && this.finallyBlock.completesByContinue();
 }
 }

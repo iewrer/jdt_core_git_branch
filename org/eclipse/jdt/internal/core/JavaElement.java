@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 2000, 2013 IBM Corporation and others.
+ * Copyright (c) 2000, 2014 IBM Corporation and others.
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
@@ -14,8 +14,7 @@ import java.io.BufferedInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
-import java.lang.reflect.InvocationTargetException;
-import java.lang.reflect.Method;
+import java.net.HttpURLConnection;
 import java.net.JarURLConnection;
 import java.net.MalformedURLException;
 import java.net.ProtocolException;
@@ -26,11 +25,36 @@ import java.net.URLConnection;
 import java.net.UnknownHostException;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Set;
 
 import org.eclipse.core.resources.IResource;
-import org.eclipse.core.runtime.*;
+import org.eclipse.core.runtime.Assert;
+import org.eclipse.core.runtime.CoreException;
+import org.eclipse.core.runtime.IAdaptable;
+import org.eclipse.core.runtime.IPath;
+import org.eclipse.core.runtime.IProgressMonitor;
+import org.eclipse.core.runtime.IStatus;
+import org.eclipse.core.runtime.PlatformObject;
 import org.eclipse.core.runtime.jobs.ISchedulingRule;
-import org.eclipse.jdt.core.*;
+import org.eclipse.jdt.core.IClassFile;
+import org.eclipse.jdt.core.IClasspathAttribute;
+import org.eclipse.jdt.core.IClasspathEntry;
+import org.eclipse.jdt.core.ICompilationUnit;
+import org.eclipse.jdt.core.IField;
+import org.eclipse.jdt.core.IJavaElement;
+import org.eclipse.jdt.core.IJavaModel;
+import org.eclipse.jdt.core.IJavaModelStatus;
+import org.eclipse.jdt.core.IJavaModelStatusConstants;
+import org.eclipse.jdt.core.IJavaProject;
+import org.eclipse.jdt.core.IMember;
+import org.eclipse.jdt.core.IOpenable;
+import org.eclipse.jdt.core.IPackageFragmentRoot;
+import org.eclipse.jdt.core.IParent;
+import org.eclipse.jdt.core.ISourceRange;
+import org.eclipse.jdt.core.ISourceReference;
+import org.eclipse.jdt.core.JavaModelException;
+import org.eclipse.jdt.core.WorkingCopyOwner;
 import org.eclipse.jdt.core.dom.ASTNode;
 import org.eclipse.jdt.core.dom.CompilationUnit;
 import org.eclipse.jdt.internal.compiler.lookup.Binding;
@@ -42,6 +66,7 @@ import org.eclipse.jdt.internal.core.util.Util;
  *
  * @see IJavaElement
  */
+@SuppressWarnings({"rawtypes", "unchecked"})
 public abstract class JavaElement extends PlatformObject implements IJavaElement {
 //	private static final QualifiedName PROJECT_JAVADOC= new QualifiedName(JavaCore.PLUGIN_ID, "project_javadoc_location"); //$NON-NLS-1$
 
@@ -68,6 +93,26 @@ public abstract class JavaElement extends PlatformObject implements IJavaElement
 	public static final char JEM_LOCALVARIABLE = '@';
 	public static final char JEM_TYPE_PARAMETER = ']';
 	public static final char JEM_ANNOTATION = '}';
+	public static final char JEM_LAMBDA_EXPRESSION = ')';
+	public static final char JEM_LAMBDA_METHOD = '&';
+	public static final char JEM_STRING = '"';
+	
+	/**
+	 * Before ')', '&' and '"' became the newest additions as delimiters, the former two
+	 * were allowed as part of element attributes and possibly stored. Trying to recreate 
+	 * elements from such memento would cause undesirable results. Consider the following 
+	 * valid project name: (abc)
+	 * If we were to use ')' alone as the delimiter and decode the above name, the memento
+	 * would be wrongly identified to contain a lambda expression.  
+	 *
+	 * In order to differentiate delimiters from characters that are part of element attributes, 
+	 * the following escape character is being introduced and all the new delimiters must 
+	 * be escaped with this. So, a lambda expression would be written as: "=)..."
+	 * 
+	 * @see JavaElement#appendEscapedDelimiter(StringBuffer, char)
+	 */
+	public static final char JEM_DELIMITER_ESCAPE = JEM_JAVAPROJECT;
+	
 
 	/**
 	 * This element's parent, or <code>null</code> if this
@@ -77,6 +122,9 @@ public abstract class JavaElement extends PlatformObject implements IJavaElement
 
 	protected static final JavaElement[] NO_ELEMENTS = new JavaElement[0];
 	protected static final Object NO_INFO = new Object();
+	
+	private static Set<String> invalidURLs = null;
+	private static Set<String> validURLs = null;
 
 	/**
 	 * Constructs a handle for a java element with
@@ -128,6 +176,16 @@ public abstract class JavaElement extends PlatformObject implements IJavaElement
 		return getElementName().equals(other.getElementName()) &&
 				this.parent.equals(other.parent);
 	}
+	/**
+	 * @see #JEM_DELIMITER_ESCAPE
+	 */
+	protected void appendEscapedDelimiter(StringBuffer buffer, char delimiter) {
+		buffer.append(JEM_DELIMITER_ESCAPE);
+		buffer.append(delimiter);
+	}
+	/*
+	 * Do not add new delimiters here
+	 */
 	protected void escapeMementoName(StringBuffer buffer, String mementoName) {
 		for (int i = 0, length = mementoName.length(); i < length; i++) {
 			char character = mementoName.charAt(i);
@@ -718,9 +776,9 @@ public abstract class JavaElement extends PlatformObject implements IJavaElement
 		if (arrayLength < toBeFoundLength)
 			return -1;
 		loop: for (int i = start, max = arrayLength - toBeFoundLength + 1; i < max; i++) {
-			if (array[i] == toBeFound[0]) {
+			if (isSameCharacter(array[i], toBeFound[0])) {
 				for (int j = 1; j < toBeFoundLength; j++) {
-					if (array[i + j] != toBeFound[j])
+					if (!isSameCharacter(array[i + j], toBeFound[j]))
 						continue loop;
 				}
 				return i;
@@ -728,51 +786,81 @@ public abstract class JavaElement extends PlatformObject implements IJavaElement
 		}
 		return -1;
 	}
+	boolean isSameCharacter(byte b1, byte b2) {
+		if (b1 == b2 || Character.toUpperCase((char) b1) == Character.toUpperCase((char) b2)) {
+			return true;
+		}
+		return false;
+	}
+	
 	/*
-	 * We don't use getContentEncoding() on the URL connection, because it might leave open streams behind.
-	 * See https://bugs.eclipse.org/bugs/show_bug.cgi?id=117890
+	 * This method caches a list of good and bad Javadoc locations in the current eclipse session. 
 	 */
-	protected String getURLContents(String docUrlValue) throws JavaModelException {
+	protected void validateAndCache(URL baseLoc, FileNotFoundException e) throws JavaModelException {
+		String url = baseLoc.toString();
+		if (validURLs != null && validURLs.contains(url)) return;
+		
+		if (invalidURLs != null && invalidURLs.contains(url)) 
+				throw new JavaModelException(e, IJavaModelStatusConstants.CANNOT_RETRIEVE_ATTACHED_JAVADOC);
+
+		InputStream input = null;
+		try {
+			URLConnection connection = baseLoc.openConnection();
+			input = connection.getInputStream();
+			if (validURLs == null) {
+				validURLs = new HashSet<String>(1);
+			}
+			validURLs.add(url);
+		} catch (Exception e1) {
+			if (invalidURLs == null) { 
+				invalidURLs = new HashSet<String>(1);
+			}
+			invalidURLs.add(url);
+			throw new JavaModelException(e, IJavaModelStatusConstants.CANNOT_RETRIEVE_ATTACHED_JAVADOC);
+		} finally {
+			if (input != null) {
+				try {
+					input.close();
+				} catch (Exception e1) {
+					// Ignore
+				}
+			}
+		}
+	}
+
+	protected String getURLContents(URL baseLoc, String docUrlValue) throws JavaModelException {
 		InputStream stream = null;
 		JarURLConnection connection2 = null;
+		URL docUrl = null;
+		URLConnection connection = null;
 		try {
-			URL docUrl = new URL(docUrlValue);
-			URLConnection connection = docUrl.openConnection();
-			Class[] parameterTypes = new Class[]{int.class};
-			Integer timeoutVal = new Integer(10000);
-			// set the connect and read timeouts using reflection since these methods are not available in java 1.4
-			Class URLClass = connection.getClass();
-			try {
-				Method connectTimeoutMethod = URLClass.getDeclaredMethod("setConnectTimeout", parameterTypes); //$NON-NLS-1$
-				Method readTimeoutMethod = URLClass.getDeclaredMethod("setReadTimeout", parameterTypes); //$NON-NLS-1$
-				connectTimeoutMethod.invoke(connection, new Object[]{timeoutVal});
-				readTimeoutMethod.invoke(connection, new Object[]{timeoutVal});
-			} catch (SecurityException e) {
-				// ignore
-			} catch (IllegalArgumentException e) {
-				// ignore
-			} catch (NoSuchMethodException e) {
-				// ignore
-			} catch (IllegalAccessException e) {
-				// ignore
-			} catch (InvocationTargetException e) {
-				// ignore
+			redirect: for (int i= 0; i < 5; i++) { // avoid endless redirects...
+				docUrl = new URL(docUrlValue);
+				connection = docUrl.openConnection();
+
+				int timeoutVal = 10000;
+				connection.setConnectTimeout(timeoutVal);
+				connection.setReadTimeout(timeoutVal);
+
+				if (connection instanceof HttpURLConnection) {
+					// HttpURLConnection doesn't redirect from http to https, see https://bugs.eclipse.org/450684
+					HttpURLConnection httpCon = (HttpURLConnection) connection;
+					if (httpCon.getResponseCode() == 301) {
+						docUrlValue = httpCon.getHeaderField("location"); //$NON-NLS-1$
+						if (docUrlValue != null) {
+							continue redirect;
+						}
+					}
+				} else if (connection instanceof JarURLConnection) {
+					connection2 = (JarURLConnection) connection;
+					// https://bugs.eclipse.org/bugs/show_bug.cgi?id=156307
+					connection.setUseCaches(false);
+				}
+				break;
 			}
-			
-			if (connection instanceof JarURLConnection) {
-				connection2 = (JarURLConnection) connection;
-				// https://bugs.eclipse.org/bugs/show_bug.cgi?id=156307
-				connection.setUseCaches(false);
-			}
-			try {
-				stream = new BufferedInputStream(connection.getInputStream());
-			} catch (IllegalArgumentException e) {
-				// https://bugs.eclipse.org/bugs/show_bug.cgi?id=304316
-				return null;
-			} catch (NullPointerException e) {
-				// https://bugs.eclipse.org/bugs/show_bug.cgi?id=304316
-				return null;
-			}
+
+			stream = new BufferedInputStream(connection.getInputStream());
+
 			String encoding = connection.getContentEncoding();
 			byte[] contents = org.eclipse.jdt.internal.compiler.util.Util.getInputStreamAsByteArray(stream, connection.getContentLength());
 			if (encoding == null) {
@@ -811,13 +899,19 @@ public abstract class JavaElement extends PlatformObject implements IJavaElement
 					return new String(contents);
 				}
 			}
+		} catch (IllegalArgumentException e) {
+			// https://bugs.eclipse.org/bugs/show_bug.cgi?id=304316
+			return null;
+		} catch (NullPointerException e) {
+			// https://bugs.eclipse.org/bugs/show_bug.cgi?id=304316
+			return null;
 		} catch (SocketTimeoutException e) {
 			throw new JavaModelException(new JavaModelStatus(IJavaModelStatusConstants.CANNOT_RETRIEVE_ATTACHED_JAVADOC_TIMEOUT, this));
 		} catch (MalformedURLException e) {
 			throw new JavaModelException(new JavaModelStatus(IJavaModelStatusConstants.CANNOT_RETRIEVE_ATTACHED_JAVADOC, this));
 		} catch (FileNotFoundException e) {
-			// Ignore, see https://bugs.eclipse.org/bugs/show_bug.cgi?id=120559 &
-			// https://bugs.eclipse.org/bugs/show_bug.cgi?id=403036
+			// https://bugs.eclipse.org/bugs/show_bug.cgi?id=403154
+			validateAndCache(baseLoc, e);
 		} catch (SocketException e) {
 			// see bug https://bugs.eclipse.org/bugs/show_bug.cgi?id=247845 &
 			// https://bugs.eclipse.org/bugs/show_bug.cgi?id=400060
@@ -832,6 +926,9 @@ public abstract class JavaElement extends PlatformObject implements IJavaElement
 			throw new JavaModelException(e, IJavaModelStatusConstants.CANNOT_RETRIEVE_ATTACHED_JAVADOC);
 		} catch (IOException e) {
 			throw new JavaModelException(e, IJavaModelStatusConstants.IO_EXCEPTION);
+		} catch(Exception e) {
+			if (e.getCause() instanceof IllegalArgumentException) return null;
+			throw new JavaModelException(e, IJavaModelStatusConstants.CANNOT_RETRIEVE_ATTACHED_JAVADOC);
 		} finally {
 			if (stream != null) {
 				try {

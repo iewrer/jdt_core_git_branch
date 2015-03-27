@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 2000, 2011 IBM Corporation and others.
+ * Copyright (c) 2000, 2014 IBM Corporation and others.
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
@@ -44,6 +44,7 @@ import org.eclipse.jdt.internal.compiler.lookup.TypeBinding;
 import org.eclipse.jdt.internal.compiler.lookup.TypeVariableBinding;
 import org.eclipse.jdt.internal.compiler.lookup.WildcardBinding;
 
+@SuppressWarnings({"rawtypes", "unchecked"})
 public class Util implements SuffixConstants {
 
 	/**
@@ -1556,4 +1557,68 @@ public class Util implements SuffixConstants {
 				return scanTypeSignature(string, start);
 		}
 	}
+
+	public static boolean effectivelyEqual(Object [] one, Object [] two) {
+		if (one == two)
+			return true;
+		int oneLength = one == null ? 0 : one.length;
+		int twoLength = two == null ? 0 : two.length;
+		if (oneLength != twoLength)
+			return false;
+		if (oneLength == 0)
+			return true;
+		for (int i = 0; i < one.length; i++) {
+			if (one[i] != two[i])
+				return false;
+		}
+		return true;
+	}
+	
+	public static void appendEscapedChar(StringBuffer buffer, char c, boolean stringLiteral) {
+		switch (c) {
+			case '\b' :
+				buffer.append("\\b"); //$NON-NLS-1$
+				break;
+			case '\t' :
+				buffer.append("\\t"); //$NON-NLS-1$
+				break;
+			case '\n' :
+				buffer.append("\\n"); //$NON-NLS-1$
+				break;
+			case '\f' :
+				buffer.append("\\f"); //$NON-NLS-1$
+				break;
+			case '\r' :
+				buffer.append("\\r"); //$NON-NLS-1$
+				break;
+			case '\"':
+				if (stringLiteral) {
+					buffer.append("\\\""); //$NON-NLS-1$
+				} else {
+					buffer.append(c);
+				}
+				break;
+			case '\'':
+				if (stringLiteral) {
+					buffer.append(c);
+				} else {
+					buffer.append("\\\'"); //$NON-NLS-1$
+				}
+				break;
+			case '\\':
+				buffer.append("\\\\"); //$NON-NLS-1$
+				break;
+			default:
+				if (c >= 0x20) {
+					buffer.append(c);
+				} else if (c >= 0x10) {
+					buffer.append("\\u00").append(Integer.toHexString(c)); //$NON-NLS-1$
+				} else if (c >= 0) {
+					buffer.append("\\u000").append(Integer.toHexString(c)); //$NON-NLS-1$
+				} else {
+					buffer.append(c);
+				}
+		}
+	}
+
 }

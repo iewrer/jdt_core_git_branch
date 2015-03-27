@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 2000, 2013 IBM Corporation and others.
+ * Copyright (c) 2000, 2014 IBM Corporation and others.
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
@@ -12,11 +12,19 @@
  *								bug 186342 - [compiler][null] Using annotations for null checking
  *								bug 365519 - editorial cleanup after bug 186342 and bug 365387
  *								bug 368546 - [compiler][resource] Avoid remaining false positives found when compiling the Eclipse SDK
+ *								bug 382353 - [1.8][compiler] Implementation property modifiers should be accepted on default methods.
  *								bug 383368 - [compiler][null] syntactic null analysis for field references
+ *								Bug 392099 - [1.8][compiler][null] Apply null annotation on types for null analysis
+ *								Bug 392238 - [1.8][compiler][null] Detect semantically invalid null type annotations
+ *								Bug 416176 - [1.8][compiler][null] null type annotations cause grief on type variables
+ *								Bug 438012 - [1.8][null] Bogus Warning: The nullness annotation is redundant with a default that applies to this location
+ *								Bug 435805 - [1.8][compiler][null] Java 8 compiler does not recognize declaration style null annotations
  *     Jesper S Moller <jesper@selskabet.org> - Contributions for
  *								bug 378674 - "The method can be declared as static" is wrong
  *******************************************************************************/
 package org.eclipse.jdt.internal.compiler.ast;
+
+import java.util.List;
 
 import org.eclipse.jdt.core.compiler.CharOperation;
 import org.eclipse.jdt.internal.compiler.ASTVisitor;
@@ -26,6 +34,7 @@ import org.eclipse.jdt.internal.compiler.flow.ExceptionHandlingFlowContext;
 import org.eclipse.jdt.internal.compiler.flow.FlowContext;
 import org.eclipse.jdt.internal.compiler.flow.FlowInfo;
 import org.eclipse.jdt.internal.compiler.impl.CompilerOptions;
+import org.eclipse.jdt.internal.compiler.lookup.BlockScope;
 import org.eclipse.jdt.internal.compiler.lookup.ClassScope;
 import org.eclipse.jdt.internal.compiler.lookup.ExtraCompilerModifiers;
 import org.eclipse.jdt.internal.compiler.lookup.LocalTypeBinding;
@@ -37,6 +46,7 @@ import org.eclipse.jdt.internal.compiler.lookup.TypeVariableBinding;
 import org.eclipse.jdt.internal.compiler.parser.Parser;
 import org.eclipse.jdt.internal.compiler.problem.AbortMethod;
 import org.eclipse.jdt.internal.compiler.problem.ProblemSeverities;
+import org.eclipse.jdt.internal.compiler.ast.TypeReference.AnnotationCollector;
 
 public class MethodDeclaration extends AbstractMethodDeclaration {
 
@@ -97,7 +107,10 @@ public class MethodDeclaration extends AbstractMethodDeclaration {
 					FlowInfo.DEAD_END);
 
 			// nullity and mark as assigned
-			analyseArguments(flowInfo);
+			if (classScope.environment().usesNullTypeAnnotations())
+				analyseArguments18(flowInfo, this.arguments, this.binding);
+			else
+				analyseArguments(flowInfo, this.arguments, this.binding);
 
 			if (this.binding.declaringClass instanceof MemberTypeBinding && !this.binding.declaringClass.isStatic()) {
 				// method of a non-static member type can't be static.
@@ -136,7 +149,7 @@ public class MethodDeclaration extends AbstractMethodDeclaration {
 			// check unused parameters
 			this.scope.checkUnusedParameters(this.binding);
 			// check if the method could have been static
-			if (!this.binding.isStatic() && (this.bits & ASTNode.CanBeStatic) != 0) {
+			if (!this.binding.isStatic() && (this.bits & ASTNode.CanBeStatic) != 0 && !this.isDefaultMethod()) {
 				if(!this.binding.isOverriding() && !this.binding.isImplementing()) {
 					if (this.binding.isPrivate() || this.binding.isFinal() || this.binding.declaringClass.isFinal()) {
 						this.scope.problemReporter().methodCanBeDeclaredStatic(this);
@@ -150,6 +163,24 @@ public class MethodDeclaration extends AbstractMethodDeclaration {
 		} catch (AbortMethod e) {
 			this.ignoreFurtherInvestigation = true;
 		}
+	}
+
+	public void getAllAnnotationContexts(int targetType, List allAnnotationContexts) {
+		AnnotationCollector collector = new AnnotationCollector(this.returnType, targetType, allAnnotationContexts);
+		for (int i = 0, max = this.annotations.length; i < max; i++) {
+			Annotation annotation = this.annotations[i];
+			annotation.traverse(collector, (BlockScope) null);
+		}
+	}
+	
+	public boolean hasNullTypeAnnotation() {
+		// parser associates SE8 annotations to the declaration
+		return TypeReference.containsNullAnnotation(this.annotations) || 
+				(this.returnType != null && this.returnType.hasNullTypeAnnotation()); // just in case
+	}
+
+	public boolean isDefaultMethod() {
+		return (this.modifiers & ExtraCompilerModifiers.AccDefaultMethod) != 0;
 	}
 
 	public boolean isMethod() {
@@ -169,6 +200,7 @@ public class MethodDeclaration extends AbstractMethodDeclaration {
 	public void resolveStatements() {
 		// ========= abort on fatal error =============
 		if (this.returnType != null && this.binding != null) {
+			this.bits |= (this.returnType.bits & ASTNode.HasTypeAnnotations);
 			this.returnType.resolvedType = this.binding.returnType;
 			// record the return type binding
 		}
@@ -183,8 +215,10 @@ public class MethodDeclaration extends AbstractMethodDeclaration {
 		}
 		if (this.typeParameters != null) {
 			for (int i = 0, length = this.typeParameters.length; i < length; i++) {
-				this.typeParameters[i].resolve(this.scope);
-				if (returnsUndeclTypeVar && this.typeParameters[i].binding == this.returnType.resolvedType) {
+				TypeParameter typeParameter = this.typeParameters[i];
+				this.bits |= (typeParameter.bits & ASTNode.HasTypeAnnotations);
+				// typeParameter is already resolved from Scope#connectTypeVariables()
+				if (returnsUndeclTypeVar && TypeBinding.equalsEquals(this.typeParameters[i].binding, this.returnType.resolvedType)) {
 					returnsUndeclTypeVar = false;
 				}
 			}
@@ -239,7 +273,6 @@ public class MethodDeclaration extends AbstractMethodDeclaration {
 			}
 		}
 
-		// by grammatical construction, interface methods are always abstract
 		switch (TypeDeclaration.kind(this.scope.referenceType().modifiers)) {
 			case TypeDeclaration.ENUM_DECL :
 				if (this.selector == TypeConstants.VALUES) break;
@@ -261,6 +294,15 @@ public class MethodDeclaration extends AbstractMethodDeclaration {
 						this.bits &= ~ASTNode.CanBeStatic;
 					}
 				}
+				break;
+			case TypeDeclaration.INTERFACE_DECL :
+				if (compilerOptions.sourceLevel >= ClassFileConstants.JDK1_8
+						&& (this.modifiers & (ExtraCompilerModifiers.AccSemicolonBody | ClassFileConstants.AccAbstract)) == ExtraCompilerModifiers.AccSemicolonBody) {
+					if ((this.modifiers & (ClassFileConstants.AccStatic | ExtraCompilerModifiers.AccDefaultMethod)) != 0) {
+							this.scope.problemReporter().methodNeedBody(this);
+					}
+				}
+				break;
 		}
 		super.resolveStatements();
 
@@ -317,12 +359,5 @@ public class MethodDeclaration extends AbstractMethodDeclaration {
 	}
 	public TypeParameter[] typeParameters() {
 	    return this.typeParameters;
-	}
-	
-	void validateNullAnnotations() {
-		super.validateNullAnnotations();
-		// null-annotations on the return type?
-		if (this.binding != null)
-			this.scope.validateNullAnnotation(this.binding.tagBits, this.returnType, this.annotations);
 	}
 }

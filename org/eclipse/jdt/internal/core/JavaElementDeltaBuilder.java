@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 2000, 2008 IBM Corporation and others.
+ * Copyright (c) 2000, 2014 IBM Corporation and others.
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
@@ -7,6 +7,7 @@
  *
  * Contributors:
  *     IBM Corporation - initial API and implementation
+ *     Vladimir Piskarev <pisv@1c.ru> - Building large Java element deltas is really slow - https://bugs.eclipse.org/443928
  *******************************************************************************/
 package org.eclipse.jdt.internal.core;
 
@@ -36,6 +37,7 @@ import org.eclipse.jdt.internal.core.util.Util;
  * createDeltas() is called, it creates a delta over the cached
  * contents and the new contents.
  */
+@SuppressWarnings({ "rawtypes", "unchecked" })
 public class JavaElementDeltaBuilder {
 	/**
 	 * The java element handle
@@ -489,10 +491,7 @@ public String toString() {
  */
 private void trimDelta(JavaElementDelta elementDelta) {
 	if (elementDelta.getKind() == IJavaElementDelta.REMOVED) {
-		IJavaElementDelta[] children = elementDelta.getAffectedChildren();
-		for(int i = 0, length = children.length; i < length; i++) {
-			elementDelta.removeAffectedChild((JavaElementDelta)children[i]);
-		}
+		elementDelta.clearAffectedChildren();
 	} else {
 		IJavaElementDelta[] children = elementDelta.getAffectedChildren();
 		for(int i = 0, length = children.length; i < length; i++) {

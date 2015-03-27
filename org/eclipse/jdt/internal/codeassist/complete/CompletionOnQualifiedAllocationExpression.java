@@ -1,10 +1,10 @@
 /*******************************************************************************
- * Copyright (c) 2000, 2011 IBM Corporation and others.
+ * Copyright (c) 2000, 2014 IBM Corporation and others.
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
  * http://www.eclipse.org/legal/epl-v10.html
- * 
+ *
  * Contributors:
  *     IBM Corporation - initial API and implementation
  *******************************************************************************/
@@ -39,13 +39,13 @@ import org.eclipse.jdt.internal.compiler.lookup.*;
 
 public class CompletionOnQualifiedAllocationExpression extends QualifiedAllocationExpression {
 public TypeBinding resolveType(BlockScope scope) {
-	TypeBinding[] argumentTypes = Binding.NO_PARAMETERS;
+	this.argumentTypes = Binding.NO_PARAMETERS;
 	if (this.arguments != null) {
 		int argsLength = this.arguments.length;
 		int length = this.arguments.length;
-		argumentTypes = new TypeBinding[length];
+		this.argumentTypes = new TypeBinding[length];
 		for (int a = argsLength; --a >= 0;) {
-			argumentTypes[a] = this.arguments[a].resolveType(scope);
+			this.argumentTypes[a] = this.arguments[a].resolveType(scope);
 		}
 	}
 	final boolean isDiamond = this.type != null && (this.type.bits & ASTNode.IsDiamond) != 0;
@@ -66,9 +66,9 @@ public TypeBinding resolveType(BlockScope scope) {
 		}
 		this.resolvedType = ((SingleTypeReference) this.type).resolveTypeEnclosing(scope, (ReferenceBinding) enclosingType);
 		if (isDiamond && (this.resolvedType instanceof ParameterizedTypeBinding)) {
-			TypeBinding [] inferredTypes = inferElidedTypes(((ParameterizedTypeBinding) this.resolvedType).genericType(), null, argumentTypes, scope);
+			TypeBinding [] inferredTypes = inferElidedTypes(scope);
 			if (inferredTypes != null) {
-				this.resolvedType = this.type.resolvedType = scope.environment().createParameterizedType(((ParameterizedTypeBinding) this.resolvedType).genericType(), inferredTypes, ((ParameterizedTypeBinding) this.resolvedType).enclosingType());
+				this.resolvedType = this.type.resolvedType = scope.environment().createParameterizedType(((ParameterizedTypeBinding) this.resolvedType).genericType(), inferredTypes, this.resolvedType.enclosingType());
 			} else {
 				// inference failed. Resolved type will be of the form Test<>
 				this.bits |= ASTNode.IsDiamond;
@@ -81,9 +81,9 @@ public TypeBinding resolveType(BlockScope scope) {
 	} else {
 	 	this.resolvedType = this.type.resolveType(scope, true /* check bounds*/);
 	 	if (isDiamond && (this.resolvedType instanceof ParameterizedTypeBinding)) {
-			TypeBinding [] inferredTypes = inferElidedTypes(((ParameterizedTypeBinding) this.resolvedType).genericType(), null, argumentTypes, scope);
+			TypeBinding [] inferredTypes = inferElidedTypes(scope);
 			if (inferredTypes != null) {
-				this.resolvedType = this.type.resolvedType = scope.environment().createParameterizedType(((ParameterizedTypeBinding) this.resolvedType).genericType(), inferredTypes, ((ParameterizedTypeBinding) this.resolvedType).enclosingType());
+				this.resolvedType = this.type.resolvedType = scope.environment().createParameterizedType(((ParameterizedTypeBinding) this.resolvedType).genericType(), inferredTypes, this.resolvedType.enclosingType());
 			} else {
 				// inference failed. Resolved type will be of the form Test<>
 				this.bits |= ASTNode.IsDiamond;
