@@ -4,11 +4,12 @@
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
  * http://www.eclipse.org/legal/epl-v10.html
- * 
+ *
  * Contributors:
  *     IBM Corporation - initial API and implementation
  *******************************************************************************/
 package org.eclipse.jdt.internal.compiler;
+// GROOVY PATCHED
 
 import java.util.HashMap;
 
@@ -957,7 +958,13 @@ private void rememberCategories() {
 		}
 	}
 }
-private void reset() {
+// GROOVY start
+/* old {
+private
+} new */
+public 
+// GROOVY end
+void reset() {
 	this.sourceEnds = new HashtableOfObjectToInt();
 	this.nodesToCategories = new HashMap();
 }

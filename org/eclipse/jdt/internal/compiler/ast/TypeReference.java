@@ -4,11 +4,12 @@
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
  * http://www.eclipse.org/legal/epl-v10.html
- * 
+ *
  * Contributors:
  *     IBM Corporation - initial API and implementation
  *******************************************************************************/
 package org.eclipse.jdt.internal.compiler.ast;
+// GROOVY PATCHED
 
 import org.eclipse.jdt.internal.compiler.ASTVisitor;
 import org.eclipse.jdt.internal.compiler.flow.FlowContext;
@@ -18,6 +19,7 @@ import org.eclipse.jdt.internal.compiler.impl.Constant;
 import org.eclipse.jdt.internal.compiler.lookup.ArrayBinding;
 import org.eclipse.jdt.internal.compiler.lookup.BlockScope;
 import org.eclipse.jdt.internal.compiler.lookup.ClassScope;
+import org.eclipse.jdt.internal.compiler.lookup.CompilationUnitScope;
 import org.eclipse.jdt.internal.compiler.lookup.ProblemReasons;
 import org.eclipse.jdt.internal.compiler.lookup.ProblemReferenceBinding;
 import org.eclipse.jdt.internal.compiler.lookup.ReferenceBinding;
@@ -178,6 +180,14 @@ protected void reportDeprecatedType(TypeBinding type, Scope scope) {
 }
 
 protected void reportInvalidType(Scope scope) {
+	// GROOVY start: don't report this, let groovy do it
+	if (scope!=null) {
+		CompilationUnitScope cuScope = scope.compilationUnitScope();
+		if (!cuScope.reportInvalidType(this, this.resolvedType)) {
+			return;
+		}
+	}
+	// GROOVY end
 	scope.problemReporter().invalidType(this, this.resolvedType);
 }
 

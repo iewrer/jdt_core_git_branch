@@ -21,7 +21,7 @@ public class SyntheticMethodBinding extends MethodBinding {
 	public FieldBinding targetWriteField;		// write access to a field
 	public MethodBinding targetMethod;			// method or constructor
 	public TypeBinding targetEnumType; 			// enum type
-	
+
 	public int purpose;
 
 	// fields used to generate enum constants when too many

@@ -18,6 +18,7 @@
  *								bug 331649 - [compiler][null] consider null annotations for fields
  *******************************************************************************/
 package org.eclipse.jdt.internal.compiler.lookup;
+// GROOVY PATCHED
 
 import java.util.ArrayList;
 
@@ -49,6 +50,10 @@ public class BinaryTypeBinding extends ReferenceBinding {
 	protected ReferenceBinding[] superInterfaces;
 	protected FieldBinding[] fields;
 	protected MethodBinding[] methods;
+	// GROOVY start
+	private boolean infraMethodsComplete = false;
+	protected MethodBinding[] infraMethods = Binding.NO_METHODS;
+	// GROOVY end
 	protected ReferenceBinding[] memberTypes;
 	protected TypeVariableBinding[] typeVariables;
 
@@ -189,7 +194,7 @@ public BinaryTypeBinding(PackageBinding packageBinding, IBinaryType binaryType, 
 		// attempt to find the enclosing type if it exists in the cache (otherwise - resolve it when requested)
 		this.enclosingType = environment.getTypeFromConstantPoolName(enclosingTypeName, 0, -1, true, null /* could not be missing */); // pretend parameterized to avoid raw
 		this.tagBits |= TagBits.MemberTypeMask;   // must be a member type not a top-level or local type
-		this.tagBits |= TagBits.HasUnresolvedEnclosingType;
+		this.tagBits |= 	TagBits.HasUnresolvedEnclosingType;
 		if (enclosingType().isStrictfp())
 			this.modifiers |= ClassFileConstants.AccStrictfp;
 		if (enclosingType().isDeprecated())
@@ -298,7 +303,7 @@ void cachePartsFrom(IBinaryType binaryType, boolean needFieldsAndMethods) {
 					// attempt to find each member type if it exists in the cache (otherwise - resolve it when requested)
 					this.memberTypes[i] = this.environment.getTypeFromConstantPoolName(memberTypeStructures[i].getName(), 0, -1, false, null /* could not be missing */);
 				}
-				this.tagBits |= TagBits.HasUnresolvedMemberTypes;
+				this.tagBits |= 	TagBits.HasUnresolvedMemberTypes;
 			}
 		}
 
@@ -309,7 +314,7 @@ void cachePartsFrom(IBinaryType binaryType, boolean needFieldsAndMethods) {
 		   of generics.
 		 */
 		char[] typeSignature = binaryType.getGenericSignature(); // use generic signature even in 1.4
-		this.tagBits |= binaryType.getTagBits();
+			this.tagBits |= binaryType.getTagBits();
 		
 		char[][][] missingTypeNames = binaryType.getMissingTypeNames();
 		SignatureWrapper wrapper = null;
@@ -334,7 +339,7 @@ void cachePartsFrom(IBinaryType binaryType, boolean needFieldsAndMethods) {
 				this.typeVariables = addMethodTypeVariables(typeVars);			
 			}
 		}
-		if (typeSignature == null)  {
+		if (typeSignature == null) {
 			char[] superclassName = binaryType.getSuperclassName();
 			if (superclassName != null) {
 				// attempt to find the superclass if it exists in the cache (otherwise - resolve it when requested)
@@ -662,6 +667,24 @@ private void createMethods(IBinaryMethod[] iMethods, long sourceLevel, char[][][
 				this.methods[index++] = method;
 			}
 		}
+		// GROOVY start
+		// hold onto the skipped methods, groovy will want to see them
+		if (this.environment.globalOptions.buildGroovyFiles==2) {
+			int skipped = initialTotal-this.methods.length-(iClinit==-1?0:1);
+			if (skipped==0) {
+				this.infraMethods = Binding.NO_METHODS;
+			} else {
+				this.infraMethods = new MethodBinding[skipped];
+				for (int i = 0, index = 0; i < initialTotal; i++) {
+					if (iClinit != i && (toSkip != null && toSkip[i] == -1)) {
+						// this is a skipped method
+						MethodBinding method = createMethod(iMethods[i], sourceLevel, missingTypeNames);
+						this.infraMethods[index++]= method;
+					}
+				}
+			}
+		}
+		// GROOVY end
 	}
 }
 
@@ -1090,6 +1113,17 @@ public ReferenceBinding[] memberTypes() {
 	this.tagBits &= ~TagBits.HasUnresolvedMemberTypes;
 	return this.memberTypes;
 }
+// GROOVY start
+public MethodBinding[] infraMethods() {
+	if (!this.infraMethodsComplete) {
+		for (int i = this.infraMethods.length; --i >= 0;) {
+			resolveTypesFor(this.infraMethods[i]);
+		}
+		this.infraMethodsComplete=true;
+	}
+	return this.infraMethods;
+}
+// GROOVY end
 // NOTE: the return type, arg & exception types of each method of a binary type are resolved when needed
 public MethodBinding[] methods() {
 	if ((this.tagBits & TagBits.AreMethodsComplete) != 0)
@@ -1235,29 +1269,29 @@ void scanMethodForNullAnnotation(IBinaryMethod method, MethodBinding methodBindi
 	int numParamAnnotations = method.getAnnotatedParametersCount();
 	if (numParamAnnotations > 0) {
 		for (int j = 0; j < numVisibleParams; j++) {
-			if (numParamAnnotations > 0) {
-				int startIndex = numParamAnnotations - numVisibleParams;
-				IBinaryAnnotation[] paramAnnotations = method.getParameterAnnotations(j+startIndex);
-				if (paramAnnotations != null) {
-					for (int i = 0; i < paramAnnotations.length; i++) {
-						char[] annotationTypeName = paramAnnotations[i].getTypeName();
-						if (annotationTypeName[0] != Util.C_RESOLVED)
-							continue;
-						char[][] typeName = CharOperation.splitOn('/', annotationTypeName, 1, annotationTypeName.length-1); // cut of leading 'L' and trailing ';'
-						if (CharOperation.equals(typeName, nonNullAnnotationName)) {
-							if (methodBinding.parameterNonNullness == null)
-								methodBinding.parameterNonNullness = new Boolean[numVisibleParams];
-							methodBinding.parameterNonNullness[j] = Boolean.TRUE;
-							break;
-						} else if (CharOperation.equals(typeName, nullableAnnotationName)) {
-							if (methodBinding.parameterNonNullness == null)
-								methodBinding.parameterNonNullness = new Boolean[numVisibleParams];
-							methodBinding.parameterNonNullness[j] = Boolean.FALSE;
-							break;
-						}
+	if (numParamAnnotations > 0) {
+		int startIndex = numParamAnnotations - numVisibleParams;
+			IBinaryAnnotation[] paramAnnotations = method.getParameterAnnotations(j+startIndex);
+			if (paramAnnotations != null) {
+				for (int i = 0; i < paramAnnotations.length; i++) {
+					char[] annotationTypeName = paramAnnotations[i].getTypeName();
+					if (annotationTypeName[0] != Util.C_RESOLVED)
+						continue;
+					char[][] typeName = CharOperation.splitOn('/', annotationTypeName, 1, annotationTypeName.length-1); // cut of leading 'L' and trailing ';'
+					if (CharOperation.equals(typeName, nonNullAnnotationName)) {
+						if (methodBinding.parameterNonNullness == null)
+							methodBinding.parameterNonNullness = new Boolean[numVisibleParams];
+						methodBinding.parameterNonNullness[j] = Boolean.TRUE;
+						break;
+					} else if (CharOperation.equals(typeName, nullableAnnotationName)) {
+						if (methodBinding.parameterNonNullness == null)
+							methodBinding.parameterNonNullness = new Boolean[numVisibleParams];
+						methodBinding.parameterNonNullness[j] = Boolean.FALSE;
+						break;
 					}
 				}
 			}
+		}
 		}
 	}
 }
@@ -1299,9 +1333,9 @@ void scanTypeForNullDefaultAnnotation(IBinaryType binaryType, PackageBinding pac
 			binaryBinding.tagBits |= annotationBit;
 			if (isPackageInfo)
 				packageBinding.defaultNullness = nullness;
-			return;
-		}
-	}
+						return;
+					}
+				}
 	if (isPackageInfo) {
 		// no default annotations found in package-info
 		packageBinding.defaultNullness = Binding.NULL_UNSPECIFIED_BY_DEFAULT;
@@ -1314,9 +1348,9 @@ void scanTypeForNullDefaultAnnotation(IBinaryType binaryType, PackageBinding pac
 			return;
 		} else if ((enclosingTypeBinding.tagBits & TagBits.AnnotationNullUnspecifiedByDefault) != 0) {
 			binaryBinding.tagBits |= TagBits.AnnotationNullUnspecifiedByDefault;
-			return;
+				return;
+			}
 		}
-	}
 	// no annotation found on the type or its enclosing types
 	// check the package-info for default annotation if not already done before
 	if (packageBinding.defaultNullness == Binding.NO_NULL_DEFAULT && !isPackageInfo) {

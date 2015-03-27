@@ -269,7 +269,7 @@ public class LocalVariable extends SourceRefElement implements ILocalVariable {
 	public IResource getCorrespondingResource() {
 		return null;
 	}
-	
+
 	/**
 	 * {@inheritDoc}
 	 * @since 3.7
@@ -416,7 +416,7 @@ public class LocalVariable extends SourceRefElement implements ILocalVariable {
 	public int hashCode() {
 		return Util.combineHashCodes(this.parent.hashCode(), this.nameStart);
 	}
-	
+
 	/**
 	 * {@inheritDoc}
 	 * @since 3.7
@@ -426,8 +426,8 @@ public class LocalVariable extends SourceRefElement implements ILocalVariable {
 	}
 
 	public boolean isStructureKnown() throws JavaModelException {
-		return true;
-	}
+        return true;
+    }
 
 	protected void toStringInfo(int tab, StringBuffer buffer, Object info, boolean showResolvedInfo) {
 		buffer.append(tabString(tab));

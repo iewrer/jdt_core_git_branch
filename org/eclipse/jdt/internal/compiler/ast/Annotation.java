@@ -4,7 +4,7 @@
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
  * http://www.eclipse.org/legal/epl-v10.html
- * 
+ *
  * Contributors:
  *     IBM Corporation - initial API and implementation
  *     Stephan Herrmann - Contributions for
@@ -13,6 +13,7 @@
  *								bug 331649 - [compiler][null] consider null annotations for fields
  *******************************************************************************/
 package org.eclipse.jdt.internal.compiler.ast;
+// GROOVY PATCHED
 
 import org.eclipse.jdt.core.compiler.CharOperation;
 import org.eclipse.jdt.internal.compiler.ASTVisitor;
@@ -186,7 +187,7 @@ public abstract class Annotation extends Expression {
 					// parameter 'false' means: this annotation cancels any defaults
 					tagBits |= TagBits.AnnotationNullUnspecifiedByDefault;
 					break;
-				}
+		}
 				tagBits |= TagBits.AnnotationNonNullByDefault;
 				break;
 		}
@@ -424,6 +425,9 @@ public abstract class Annotation extends Expression {
 						break;
 				}
 			}
+			// GROOVY start
+			if (scope.compilationUnitScope().checkTargetCompatibility()) {
+			// GROOVY end
 			// check (meta)target compatibility
 			checkTargetCompatibility: {
 				long metaTagBits = annotationType.getAnnotationTagBits(); // could be forward reference
@@ -467,6 +471,9 @@ public abstract class Annotation extends Expression {
 						break;
 				}
 				scope.problemReporter().disallowedTargetForAnnotation(this);
+				// GROOVY start
+				}
+				// GROOVY end
 			}
 		}
 		return this.resolvedType;

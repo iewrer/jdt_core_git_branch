@@ -2502,9 +2502,9 @@ public static int validateMatchRule(String stringPattern, int matchRule) {
 
 	// Verify Regexp match rule
 	if ((matchRule & R_REGEXP_MATCH) != 0) {
-		// regexp is not supported yet
-		return -1;
-	}
+			// regexp is not supported yet
+			return -1;
+		}
 
 	// Verify Pattern match rule
 	if (stringPattern != null) {

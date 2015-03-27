@@ -9,7 +9,9 @@
  *     IBM Corporation - initial API and implementation
  *******************************************************************************/
 package org.eclipse.jdt.internal.core;
+// GROOVY PATCHED
 
+import org.codehaus.jdt.groovy.integration.LanguageSupportFactory;
 import org.eclipse.core.resources.IResource;
 import org.eclipse.core.resources.IContainer;
 import org.eclipse.core.runtime.CoreException;
@@ -62,6 +64,10 @@ static Object[] computeFolderNonJavaResources(IPackageFragmentRoot root, IContai
 	int nonJavaResourcesCounter = 0;
 	JavaProject project = (JavaProject) root.getJavaProject();
 	try {
+	    // GROOVY start
+		// here, we only care about non-source package roots in Groovy projects
+		boolean isInterestingPackageRoot = LanguageSupportFactory.isInterestingProject(project.getProject()) && root.getRawClasspathEntry().getEntryKind() != IClasspathEntry.CPE_SOURCE;
+		// GROOVY end
 		IClasspathEntry[] classpath = project.getResolvedClasspath();
 		IResource[] members = folder.members();
 		int length = members.length;
@@ -75,7 +81,14 @@ static Object[] computeFolderNonJavaResources(IPackageFragmentRoot root, IContai
 						String fileName = member.getName();
 
 						// ignore .java files that are not excluded
-						if (Util.isValidCompilationUnitName(fileName, sourceLevel, complianceLevel) && !Util.isExcluded(member, inclusionPatterns, exclusionPatterns))
+					    // GROOVY start
+						/* old {
+						 if (Util.isValidCompilationUnitName(fileName, sourceLevel, complianceLevel) && !Util.isExcluded(member, inclusionPatterns, exclusionPatterns))
+						} new */
+						if ((Util.isValidCompilationUnitName(fileName, sourceLevel, complianceLevel) && !Util.isExcluded(member, inclusionPatterns, exclusionPatterns)) &&
+								// we want to show groovy scripts that are coming from class folders
+								!(isInterestingPackageRoot && LanguageSupportFactory.isInterestingSourceFile(fileName)))
+						// GROOVY end
 							continue nextResource;
 						// ignore .class files
 						if (Util.isValidClassFileName(fileName, sourceLevel, complianceLevel))

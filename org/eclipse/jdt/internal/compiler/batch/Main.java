@@ -1775,6 +1775,9 @@ public void configure(String[] argv) {
 	boolean didSpecifyDeprecation = false;
 	boolean didSpecifyCompliance = false;
 	boolean didSpecifyDisabledAnnotationProcessing = false;
+	// GROOVY start
+	boolean encounteredGroovySourceFile = false;
+	// GROOVY end
 
 	String customEncoding = null;
 	String customDestinationPath = null;
@@ -1910,7 +1913,20 @@ public void configure(String[] argv) {
 					}
 				}
 
+
+				// GROOVY promote that suffix to a constant elsewhere - respect registered java like languages? (does that work for batch environment)
+				/* GROOVY change start: allow .groovy files through as source
+				// old code:{
 				if (currentArg.endsWith(SuffixConstants.SUFFIX_STRING_java)) {
+				}new code: */
+				if (currentArg.endsWith(SuffixConstants.SUFFIX_STRING_java) 
+					|| currentArg.endsWith(".groovy")) {				 //$NON-NLS-1$
+				
+					if (currentArg.endsWith(".groovy")) { //$NON-NLS-1$
+						encounteredGroovySourceFile = true;
+					}
+
+				// GROOVY change end
 					if (this.filenames == null) {
 						this.filenames = new String[argCount - index];
 						this.encodings = new String[argCount - index];
@@ -2274,12 +2290,12 @@ public void configure(String[] argv) {
 						tokenCounter++;
 						switch(token.charAt(0)) {
 							case '+' :
-								isEnabling = true;
-								token = token.substring(1);
+									isEnabling = true;
+									token = token.substring(1);
 								break;
 							case '-' :
-								isEnabling = false;
-								token = token.substring(1);
+									isEnabling = false;
+									token = token.substring(1);
 						}
 						handleWarningToken(token, isEnabling);
 					}
@@ -2323,12 +2339,12 @@ public void configure(String[] argv) {
 						tokenCounter++;
 						switch(token.charAt(0)) {
 							case '+' :
-								isEnabling = true;
-								token = token.substring(1);
+									isEnabling = true;
+									token = token.substring(1);
 								break;
 							case '-' :
-								isEnabling = false;
-								token = token.substring(1);
+									isEnabling = false;
+									token = token.substring(1);
 								break;
 						}
 						handleErrorToken(token, isEnabling);
@@ -2722,6 +2738,21 @@ public void configure(String[] argv) {
 			CompilerOptions.PRIVATE);
 	}
 
+	// GROOVY start
+	// grails 1.1 batch builds need the extra phase
+	//optionMap.put(CompilerOptions.OPTIONG_GroovyFlags,"1");
+	if (encounteredGroovySourceFile) {
+		this.options.put(
+				CompilerOptions.OPTIONG_BuildGroovyFiles,
+				CompilerOptions.ENABLED);
+	} else {
+		this.options.put(
+				CompilerOptions.OPTIONG_BuildGroovyFiles,
+				CompilerOptions.DISABLED);		
+	}
+	// GROOVY end
+
+
 	if (printUsageRequired || (filesCount == 0 && classCount == 0)) {
 		if (usageSection ==  null) {
 			printUsage(); // default
@@ -2870,7 +2901,7 @@ private void initializeWarnings(String propertiesFile) {
 	// when using a properties file mimic relevant defaults from JavaCorePreferenceInitializer:
 	if (!properties.containsKey(CompilerOptions.OPTION_LocalVariableAttribute)) {
 		this.options.put(CompilerOptions.OPTION_LocalVariableAttribute, CompilerOptions.GENERATE);
-	}
+}
 	if (!properties.containsKey(CompilerOptions.OPTION_PreserveUnusedLocal)) {
 		this.options.put(CompilerOptions.OPTION_PreserveUnusedLocal, CompilerOptions.PRESERVE);
 	}
@@ -3487,7 +3518,7 @@ private void handleErrorOrWarningToken(String token, boolean isEnabling, int sev
 					this.options.put(
 						CompilerOptions.OPTION_ReportInvalidJavadocTagsVisibility,
 						CompilerOptions.PRIVATE);
-				}
+			}
 				return;
 			} else if (token.equals("invalidJavadocTag")) { //$NON-NLS-1$
 				this.options.put(
@@ -3510,18 +3541,18 @@ private void handleErrorOrWarningToken(String token, boolean isEnabling, int sev
 				String visibility = null;
 				if (isEnabling && start >= 0 && end >= 0 && start < end){
 					visibility = token.substring(start+1, end).trim();
-				}
+			}
 				if (visibility != null && visibility.equals(CompilerOptions.PUBLIC)
 						|| visibility.equals(CompilerOptions.PRIVATE)
 						|| visibility.equals(CompilerOptions.PROTECTED)
 						|| visibility.equals(CompilerOptions.DEFAULT)) {
-					this.options.put(
+				this.options.put(
 							CompilerOptions.OPTION_ReportInvalidJavadocTagsVisibility,
 							visibility);
-					return;
+				return;
 				} else {
 					throw new IllegalArgumentException(this.bind("configure.invalidJavadocTagVisibility", token)); //$NON-NLS-1$
-				}
+			}
 			}
 			break;
 		case 'j' :
@@ -3887,7 +3918,7 @@ private void handleErrorOrWarningToken(String token, boolean isEnabling, int sev
 						CompilerOptions.OPTION_ReportUnusedParameterWhenImplementingAbstract,
 						isEnabling ? CompilerOptions.ENABLED : CompilerOptions.DISABLED);
 				return;
-			}  else if (token.equals("unusedTypeArgs")) { //$NON-NLS-1$
+			} else if (token.equals("unusedTypeArgs")) { //$NON-NLS-1$
 				setSeverity(CompilerOptions.OPTION_ReportUnusedTypeArgumentsForMethodInvocation, severity, isEnabling);
 				setSeverity(CompilerOptions.OPTION_ReportRedundantSpecificationOfTypeArguments, severity, isEnabling);
 				return;

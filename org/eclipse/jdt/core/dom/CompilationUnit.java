@@ -10,6 +10,7 @@
  *******************************************************************************/
 
 package org.eclipse.jdt.core.dom;
+// GROOVY PATCHED
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -204,6 +205,9 @@ public class CompilationUnit extends ASTNode {
 	 *
 	 * @param ast the AST that is to own this node
 	 */
+	// GROOVY start: made protected from default
+	protected 
+	// GROOVY end
 	CompilationUnit(AST ast) {
 		super(ast);
 	}
@@ -211,6 +215,9 @@ public class CompilationUnit extends ASTNode {
 	/* (omit javadoc for this method)
 	 * Method declared on ASTNode.
 	 */
+	// GROOVY start: make protected (from default)
+	protected
+	// GROOVY end
 	void accept0(ASTVisitor visitor) {
 		boolean visitChildren = visitor.visit(this);
 		if (visitChildren) {

@@ -4,12 +4,14 @@
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
  * http://www.eclipse.org/legal/epl-v10.html
- * 
+ *
  * Contributors:
  *     IBM Corporation - initial API and implementation
  *******************************************************************************/
 package org.eclipse.jdt.internal.core.search.matching;
+// GROOVY PATCHED
 
+import org.codehaus.jdt.groovy.integration.LanguageSupportFactory;
 import org.eclipse.jdt.core.search.IJavaSearchConstants;
 import org.eclipse.jdt.internal.compiler.ASTVisitor;
 import org.eclipse.jdt.internal.compiler.ast.*;
@@ -28,10 +30,19 @@ public class MatchLocatorParser extends Parser {
 	final int patternFineGrain;
 
 public static MatchLocatorParser createParser(ProblemReporter problemReporter, MatchLocator locator) {
+	// GROOVY Start
+	/* old {
 	if ((locator.matchContainer & PatternLocator.COMPILATION_UNIT_CONTAINER) != 0) {
 		return new ImportMatchLocatorParser(problemReporter, locator);
 	}
 	return new MatchLocatorParser(problemReporter, locator);
+	} new */
+	// use multiplexing parsers instead
+	if ((locator.matchContainer & PatternLocator.COMPILATION_UNIT_CONTAINER) != 0) {
+		return LanguageSupportFactory.getImportMatchLocatorParser(problemReporter, locator);
+	}
+	return LanguageSupportFactory.getMatchLocatorParser(problemReporter, locator);
+	// GROOVY End
 }
 
 /**
@@ -90,7 +101,13 @@ public class ClassAndMethodDeclarationVisitor extends ClassButNoMethodDeclaratio
 	}
 }
 
-protected MatchLocatorParser(ProblemReporter problemReporter, MatchLocator locator) {
+//GROOVY Start
+//make public
+//Original code
+//protected 
+public
+//GROOVY End
+MatchLocatorParser(ProblemReporter problemReporter, MatchLocator locator) {
 	super(problemReporter, true);
 	this.reportOnlyOneSyntaxError = true;
 	this.patternLocator = locator.patternLocator;
@@ -214,29 +231,29 @@ protected void consumeCastExpressionLL1() {
 	if ((this.patternFineGrain & IJavaSearchConstants.CAST_TYPE_REFERENCE) != 0) {
 		CastExpression castExpression = (CastExpression) this.expressionStack[this.expressionPtr];
 		this.patternLocator.match(castExpression.type, this.nodeSet);
+        }
 	}
-}
 protected void consumeCastExpressionWithGenericsArray() {
 	super.consumeCastExpressionWithGenericsArray();
 	if ((this.patternFineGrain & IJavaSearchConstants.CAST_TYPE_REFERENCE) != 0) {
 		CastExpression castExpression = (CastExpression) this.expressionStack[this.expressionPtr];
 		this.patternLocator.match(castExpression.type, this.nodeSet);
+        }
 	}
-}
 protected void consumeCastExpressionWithNameArray() {
 	super.consumeCastExpressionWithNameArray();
 	if ((this.patternFineGrain & IJavaSearchConstants.CAST_TYPE_REFERENCE) != 0) {
 		CastExpression castExpression = (CastExpression) this.expressionStack[this.expressionPtr];
 		this.patternLocator.match(castExpression.type, this.nodeSet);
+        }
 	}
-}
 protected void consumeCastExpressionWithPrimitiveType() {
 	super.consumeCastExpressionWithPrimitiveType();
 	if ((this.patternFineGrain & IJavaSearchConstants.CAST_TYPE_REFERENCE) != 0) {
 		CastExpression castExpression = (CastExpression) this.expressionStack[this.expressionPtr];
 		this.patternLocator.match(castExpression.type, this.nodeSet);
+        }
 	}
-}
 protected void consumeCastExpressionWithQualifiedGenericsArray() {
 	super.consumeCastExpressionWithQualifiedGenericsArray();
 	if ((this.patternFineGrain & IJavaSearchConstants.CAST_TYPE_REFERENCE) != 0) {
@@ -524,9 +541,9 @@ protected void consumeStatementCatch() {
 				this.patternLocator.match(refs[i], this.nodeSet);
 			}
 		} else {
-			this.patternLocator.match(localDeclaration.type, this.nodeSet);
-		}
+		this.patternLocator.match(localDeclaration.type, this.nodeSet);
 	}
+}
 }
 
 protected void consumeTypeArgumentList1() {

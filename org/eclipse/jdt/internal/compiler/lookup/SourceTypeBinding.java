@@ -23,6 +23,7 @@
  *								bug 380896 - [compiler][null] Enum constants not recognised as being NonNull.
  *******************************************************************************/
 package org.eclipse.jdt.internal.compiler.lookup;
+// GROOVY PATCHED
 
 import java.util.HashMap;
 import java.util.Iterator;
@@ -660,7 +661,7 @@ public char[] computeUniqueKey(boolean isLeaf) {
 		if (start == 0)
 			start = 1; // start after L
 		if (this.isMemberType()) {
-			end = CharOperation.indexOf('$', uniqueKey, start);
+		end = CharOperation.indexOf('$', uniqueKey, start);
 		} else {
 			// '$' is part of the type name
 			end = -1;
@@ -989,6 +990,13 @@ public FieldBinding getField(char[] fieldName, boolean needResolve) {
 	return null;
 }
 
+// GROOVY start
+// FIXASC (M3) is this the right approach to adding extra methods? Probably not - they should be forced on when created
+public MethodBinding[] getAnyExtraMethods(char[] selector) {
+	return (this.scope==null?null:this.scope.getAnyExtraMethods(selector));
+}
+// GROOVY end
+
 // NOTE: the return type, arg & exception types of each method of a source type are resolved when needed
 public MethodBinding[] getMethods(char[] selector) {
 	if ((this.tagBits & TagBits.AreMethodsComplete) != 0) {
@@ -1285,7 +1293,7 @@ public MethodBinding[] methods() {
 													break;
 												}
 											} else  {
-												break;
+											break;
 											}
 										}
 										if (params1[index] == params2[index]) {
@@ -1306,7 +1314,7 @@ public MethodBinding[] methods() {
 														break;
 													}
 												} else  {
-													break;
+												break;
 												}
 											}
 										
@@ -1426,40 +1434,40 @@ public FieldBinding resolveTypeFor(FieldBinding field) {
 		if (fieldDecls[f].binding != field)
 			continue;
 
-		MethodScope initializationScope = field.isStatic()
-			? this.scope.referenceContext.staticInitializerScope
-			: this.scope.referenceContext.initializerScope;
-		FieldBinding previousField = initializationScope.initializedField;
-		try {
-			initializationScope.initializedField = field;
-			FieldDeclaration fieldDecl = fieldDecls[f];
-			TypeBinding fieldType =
-				fieldDecl.getKind() == AbstractVariableDeclaration.ENUM_CONSTANT
-					? initializationScope.environment().convertToRawType(this, false /*do not force conversion of enclosing types*/) // enum constant is implicitly of declaring enum type
-					: fieldDecl.type.resolveType(initializationScope, true /* check bounds*/);
-			field.type = fieldType;
-			field.modifiers &= ~ExtraCompilerModifiers.AccUnresolved;
-			if (fieldType == null) {
-				fieldDecl.binding = null;
-				return null;
-			}
-			if (fieldType == TypeBinding.VOID) {
-				this.scope.problemReporter().variableTypeCannotBeVoid(fieldDecl);
-				fieldDecl.binding = null;
-				return null;
-			}
-			if (fieldType.isArrayType() && ((ArrayBinding) fieldType).leafComponentType == TypeBinding.VOID) {
-				this.scope.problemReporter().variableTypeCannotBeVoidArray(fieldDecl);
-				fieldDecl.binding = null;
-				return null;
-			}
-			if ((fieldType.tagBits & TagBits.HasMissingType) != 0) {
-				field.tagBits |= TagBits.HasMissingType;
-			}
-			TypeBinding leafType = fieldType.leafComponentType();
-			if (leafType instanceof ReferenceBinding && (((ReferenceBinding)leafType).modifiers & ExtraCompilerModifiers.AccGenericSignature) != 0) {
-				field.modifiers |= ExtraCompilerModifiers.AccGenericSignature;
-			}
+			MethodScope initializationScope = field.isStatic()
+				? this.scope.referenceContext.staticInitializerScope
+				: this.scope.referenceContext.initializerScope;
+			FieldBinding previousField = initializationScope.initializedField;
+			try {
+				initializationScope.initializedField = field;
+				FieldDeclaration fieldDecl = fieldDecls[f];
+				TypeBinding fieldType =
+					fieldDecl.getKind() == AbstractVariableDeclaration.ENUM_CONSTANT
+						? initializationScope.environment().convertToRawType(this, false /*do not force conversion of enclosing types*/) // enum constant is implicitly of declaring enum type
+						: fieldDecl.type.resolveType(initializationScope, true /* check bounds*/);
+				field.type = fieldType;
+				field.modifiers &= ~ExtraCompilerModifiers.AccUnresolved;
+				if (fieldType == null) {
+					fieldDecl.binding = null;
+					return null;
+				}
+				if (fieldType == TypeBinding.VOID) {
+					this.scope.problemReporter().variableTypeCannotBeVoid(fieldDecl);
+					fieldDecl.binding = null;
+					return null;
+				}
+				if (fieldType.isArrayType() && ((ArrayBinding) fieldType).leafComponentType == TypeBinding.VOID) {
+					this.scope.problemReporter().variableTypeCannotBeVoidArray(fieldDecl);
+					fieldDecl.binding = null;
+					return null;
+				}
+				if ((fieldType.tagBits & TagBits.HasMissingType) != 0) {
+					field.tagBits |= TagBits.HasMissingType;
+				}
+				TypeBinding leafType = fieldType.leafComponentType();
+				if (leafType instanceof ReferenceBinding && (((ReferenceBinding)leafType).modifiers & ExtraCompilerModifiers.AccGenericSignature) != 0) {
+					field.modifiers |= ExtraCompilerModifiers.AccGenericSignature;
+				}
 
 			// apply null default:
 			LookupEnvironment environment = this.scope.environment();
@@ -1476,9 +1484,9 @@ public FieldBinding resolveTypeFor(FieldBinding field) {
 					this.scope.validateNullAnnotation(field.tagBits, fieldDecl.type, fieldDecl.annotations);
 				}
 			}
-		} finally {
-		    initializationScope.initializedField = previousField;
-		}
+			} finally {
+			    initializationScope.initializedField = previousField;
+			}
 		return field;
 	}
 	return null; // should never reach this point
@@ -1497,8 +1505,30 @@ public MethodBinding resolveTypesFor(MethodBinding method) {
 		method.modifiers |= ExtraCompilerModifiers.AccRestrictedAccess;
 
 	AbstractMethodDeclaration methodDecl = method.sourceMethod();
+	// GROOVY
+	/* old {
 	if (methodDecl == null) return null; // method could not be resolved in previous iteration
-
+    } new*/
+	if (methodDecl == null) {
+		if (method instanceof LazilyResolvedMethodBinding) {
+			LazilyResolvedMethodBinding lrMethod = (LazilyResolvedMethodBinding)method;
+			// the rest is a copy of the code below but doesn't depend on the method declaration
+			// nothing to do for method type parameters (there are none)
+			// nothing to do for method exceptions (there are none)
+			TypeBinding ptb = lrMethod.getParameterTypeBinding();
+			if (ptb==null) {
+				method.parameters = Binding.NO_PARAMETERS;
+			} else {
+				method.parameters = new TypeBinding[]{ptb};
+			}
+			method.returnType = lrMethod.getReturnTypeBinding();
+			method.modifiers &= ~ExtraCompilerModifiers.AccUnresolved;
+			return method;
+		}
+		// returning null is what this clause would have done anyway
+		return null;
+	}
+	// FIXASC - end
 
 	TypeParameter[] typeParameters = methodDecl.typeParameters();
 	if (typeParameters != null) {
@@ -1806,6 +1836,7 @@ public ReferenceBinding superclass() {
 public ReferenceBinding[] superInterfaces() {
 	return this.superInterfaces;
 }
+
 public SyntheticMethodBinding[] syntheticMethods() {
 	if (this.synthetics == null 
 			|| this.synthetics[SourceTypeBinding.METHOD_EMUL] == null 

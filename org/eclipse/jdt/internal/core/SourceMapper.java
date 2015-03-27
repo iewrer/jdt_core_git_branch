@@ -11,6 +11,7 @@
  *     Stephan Herrmann - Contribution for Bug 380048 - error popup when navigating to source files
  *******************************************************************************/
 package org.eclipse.jdt.internal.core;
+// GROOVY PATCHED
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -25,9 +26,11 @@ import java.util.Set;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 
+import org.codehaus.jdt.groovy.integration.LanguageSupportFactory;
 import org.eclipse.core.resources.IContainer;
 import org.eclipse.core.resources.IFile;
 import org.eclipse.core.resources.IFolder;
+import org.eclipse.core.resources.IProject;
 import org.eclipse.core.resources.IResource;
 import org.eclipse.core.resources.ResourcesPlugin;
 import org.eclipse.core.runtime.CoreException;
@@ -1148,7 +1151,7 @@ public class SourceMapper
 					return UNKNOWN_RANGE;
 				} else {
 					return ranges[1];
-				}
+		}
 		}
 		SourceRange[] ranges = (SourceRange[]) this.sourceRanges.get(element);
 		if (ranges == null) {
@@ -1427,7 +1430,12 @@ public class SourceMapper
 				}
 			}
 			boolean doFullParse = hasToRetrieveSourceRangesForLocalClass(fullName);
-			parser = new SourceElementParser(this, factory, new CompilerOptions(this.options), doFullParse, true/*optimize string literals*/);
+	        // GROOVY start
+	        /* old {
+			parser = new SourceElementParser(this, factory, new CompilerOptions(this.options), doFullParse, true/*optimize string literals..);
+	        } new */
+			parser = LanguageSupportFactory.getSourceElementParser(this, factory, new CompilerOptions(this.options), doFullParse, true/*optimize string literals*/, true);
+	        // GROOVY end
 			parser.javadocParser.checkDocComment = false; // disable javadoc parsing
 			IJavaElement javaElement = this.binaryType.getCompilationUnit();
 			if (javaElement == null) javaElement = this.binaryType.getParent();
@@ -1435,6 +1443,17 @@ public class SourceMapper
 				new BasicCompilationUnit(contents, null, this.binaryType.sourceFileName(info), javaElement),
 				doFullParse,
 				null/*no progress*/);
+			// GROOVY start
+	        // if this is an interesting file in an interesting project,
+			// then filter out all binary members that do not have a direct
+			// mapping to the source
+			IProject project = javaElement.getJavaProject().getProject();
+			if (LanguageSupportFactory.isInterestingProject(project) && 
+					LanguageSupportFactory.isInterestingSourceFile(this.binaryType.getSourceFileName(info))) {
+				LanguageSupportFactory.filterNonSourceMembers(this.binaryType);
+			}
+			
+			// GROOVY end
 			if (elementToFind != null) {
 				ISourceRange range = getNameRange(elementToFind);
 				return range;

@@ -77,7 +77,7 @@ public class ClassLiteralAccess extends Expression {
 		this.constant = Constant.NotAConstant;
 		if ((this.targetType = this.type.resolveType(scope, true /* check bounds*/)) == null)
 			return null;
-		
+
 		/* https://bugs.eclipse.org/bugs/show_bug.cgi?id=320463
 		   https://bugs.eclipse.org/bugs/show_bug.cgi?id=312076
 		   JLS3 15.8.2 forbids the type named in the class literal expression from being a parameterized type.

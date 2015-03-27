@@ -203,7 +203,7 @@ public char[][][] collect() throws JavaModelException {
 			}
 			if (openable instanceof ICompilationUnit) {
 				ICompilationUnit unit = (ICompilationUnit) openable;
-				CompilationUnitDeclaration parsedUnit = buildBindings(unit, true /*only top level and member types are visible to the focus type*/);
+				CompilationUnitDeclaration parsedUnit = buildBindings(unit, true /*only toplevel and member types are visible to the focus type*/);
 				if (parsedUnit != null)
 					parsedUnit.traverse(new TypeDeclarationVisitor(), parsedUnit.scope);
 			} else if (openable instanceof IClassFile) {

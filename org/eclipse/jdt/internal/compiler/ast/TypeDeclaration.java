@@ -13,6 +13,7 @@
  *     Keigo Imai - Contribution for  bug 388903 - Cannot extend inner class as an anonymous class when it extends the outer class
  *******************************************************************************/
 package org.eclipse.jdt.internal.compiler.ast;
+// GROOVY PATCHED
 
 import org.eclipse.jdt.core.compiler.*;
 import org.eclipse.jdt.internal.compiler.*;
@@ -1357,7 +1358,7 @@ public void traverse(ASTVisitor visitor, CompilationUnitScope unitScope) {
 }
 
 /**
- *	Iteration for a local inner type
+ *	Iteration for a local innertype
  */
 public void traverse(ASTVisitor visitor, BlockScope blockScope) {
 	try {
@@ -1494,5 +1495,9 @@ void updateMaxFieldCount() {
 public boolean isSecondary() {
 	return (this.bits & ASTNode.IsSecondaryType) != 0;
 }
-
+// GROOVY start
+public boolean isScannerUsableOnThisDeclaration() {
+	return true;
+}
+// GROOVY end
 }

@@ -445,7 +445,7 @@ public class BindingKeyParser {
 	private boolean hasTypeName = true;
 
 	private boolean isMalformed;
-	
+
 	private boolean isParsingThrownExceptions = false;	// https://bugs.eclipse.org/bugs/show_bug.cgi?id=336451
 
 	public BindingKeyParser(BindingKeyParser parser) {

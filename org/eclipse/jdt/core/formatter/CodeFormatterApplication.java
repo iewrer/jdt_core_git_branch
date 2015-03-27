@@ -36,7 +36,7 @@ import org.eclipse.text.edits.TextEdit;
 
 /**
  * Implements an Eclipse Application for org.eclipse.jdt.core.JavaCodeFormatter.
- * 
+ *
  * <p>On MacOS, when invoked using the Eclipse executable, the "user.dir" property is set to the folder
  * in which the eclipse.ini file is located. This makes it harder to use relative paths to point to the 
  * files to be formatted or the configuration file to use to set the code formatter's options.</p>

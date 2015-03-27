@@ -9,6 +9,7 @@
  *     IBM Corporation - initial API and implementation
  *******************************************************************************/
 package org.eclipse.jdt.internal.compiler.problem;
+// GROOVY PATCHED
 
 import org.eclipse.jdt.core.compiler.CategorizedProblem;
 import org.eclipse.jdt.core.compiler.CharOperation;
@@ -21,6 +22,7 @@ import org.eclipse.jdt.internal.compiler.env.ICompilationUnit;
 import org.eclipse.jdt.internal.compiler.impl.CompilerOptions;
 import org.eclipse.jdt.internal.compiler.impl.ReferenceContext;
 import org.eclipse.jdt.internal.compiler.util.Util;
+import org.eclipse.jdt.internal.core.builder.SourceFile;
 
 /*
  * Compiler error handler, responsible to determine whether
@@ -181,6 +183,13 @@ public void handle(
 			}
 			break;
 		case ProblemSeverities.Warning :
+			// GROOVY start - still required?
+			if ((this.options.groovyFlags & 0x01) != 0) {
+				if ((unitResult.compilationUnit instanceof SourceFile) && ((SourceFile)unitResult.compilationUnit).isInLinkedSourceFolder()) {
+					return;
+				}
+			}
+			// GROOVY end
 			record(problem, unitResult, referenceContext, false);
 			break;
 	}

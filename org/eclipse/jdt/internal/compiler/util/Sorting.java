@@ -54,7 +54,6 @@ public class Sorting {
 		// done with supers, now input[i] can safely be transferred:
 		output[o++] = input[i];
 		input[i] = null;
-
 		return o;
 	}
 	// if superclass is within the set of types to sort,

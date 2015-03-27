@@ -23,6 +23,7 @@
  *								bug 404146 - [1.7][compiler] nested try-catch-finally-blocks leads to unrunnable Java byte code
  *******************************************************************************/
 package org.eclipse.jdt.internal.compiler.impl;
+// GROOVY PATCHED
 
 import java.io.ByteArrayInputStream;
 import java.io.InputStreamReader;
@@ -171,6 +172,18 @@ public class CompilerOptions {
 	public static final String OPTION_SyntacticNullAnalysisForFields = "org.eclipse.jdt.core.compiler.problem.syntacticNullAnalysisForFields"; //$NON-NLS-1$
 	public static final String OPTION_InheritNullAnnotations = "org.eclipse.jdt.core.compiler.annotation.inheritNullAnnotations";  //$NON-NLS-1$
 	public static final String OPTION_ReportNonnullParameterAnnotationDropped = "org.eclipse.jdt.core.compiler.problem.nonnullParameterAnnotationDropped";  //$NON-NLS-1$
+	// GROOVY start
+	// This first one is the MASTER OPTION and if null, rather than ENABLED or DISABLED then the compiler will abort
+	// FIXASC (M3) aborting is just a short term action to enable us to ensure the right paths into the compiler configure it
+	public static final String OPTIONG_BuildGroovyFiles = "org.eclipse.jdt.core.compiler.groovy.buildGroovyFiles"; //$NON-NLS-1$
+	public static final String OPTIONG_GroovyFlags = "org.eclipse.jdt.core.compiler.groovy.projectFlags"; //$NON-NLS-1$
+	public static final String OPTIONG_GroovyClassLoaderPath = "org.eclipse.jdt.core.compiler.groovy.groovyClassLoaderPath"; //$NON-NLS-1$
+	public static final String OPTIONG_GroovyProjectName = "org.eclipse.jdt.core.compiler.groovy.groovyProjectName"; //$NON-NLS-1$
+	public static final String OPTIONG_GroovyExtraImports = "org.eclipse.jdt.core.compiler.groovy.groovyExtraImports"; //$NON-NLS-1$
+	public static final String OPTIONG_GroovyTransformsToRunOnReconcile = "org.eclipse.jdt.core.compiler.groovy.groovyTransformsToRunOnReconcile"; //$NON-NLS-1$
+	public static final String OPTIONG_GroovyCustomizerClassesList = "org.eclipse.jdt.core.compiler.groovy.groovyCustomizerClassesList"; //$NON-NLS-1$
+	// GROOVY end
+	
 	/**
 	 * Possible values for configurable options
 	 */
@@ -413,6 +426,17 @@ public class CompilerOptions {
 	 */
 	public boolean ignoreSourceFolderWarningOption;
 
+	// GROOVY start
+	public int buildGroovyFiles = 0; // 0=dontknow 1=no 2=yes
+	public int groovyFlags = 0; // 0x01 == IsGrails
+	
+	public String groovyCustomizerClassesList = null;
+	public String groovyClassLoaderPath = null;
+	public String groovyExtraImports = null;
+	public String groovyProjectName = null;
+	public String groovyTransformsToRunOnReconcile = null;
+	// GROOVY end
+
 	// === Support for Null Annotations: ===
 	/** Master switch for null analysis based on annotations: */
 	public boolean isAnnotationBasedNullAnalysisEnabled;
@@ -428,7 +452,7 @@ public class CompilerOptions {
 	public boolean analyseResourceLeaks;
 	/** Should missing enum cases be reported even if a default case exists in the same switch? */
 	public boolean reportMissingEnumCaseDespiteDefault;
-	
+
 	/** Should the compiler tolerate illegal ambiguous varargs invocation in compliance < 1.7 
 	 * to be bug compatible with javac? (bug 383780) */
 	public static boolean tolerateIllegalAmbiguousVarargsInvocation;
@@ -459,7 +483,7 @@ public class CompilerOptions {
 		"null", //$NON-NLS-1$
 		"rawtypes", //$NON-NLS-1$
 		"resource", //$NON-NLS-1$
-		"restriction", //$NON-NLS-1$		
+		"restriction", //$NON-NLS-1$
 		"serial", //$NON-NLS-1$
 		"static-access", //$NON-NLS-1$
 		"static-method", //$NON-NLS-1$
@@ -922,7 +946,7 @@ public class CompilerOptions {
 			case InvalidJavadoc :
 			case MissingJavadocComments :
 			case MissingJavadocTags:
-				return "javadoc"; //$NON-NLS-1$
+				return "javadoc"; //$NON-NLS-1$				
 			case MissingSynchronizedModifierInInheritedMethod:
 				return "sync-override";	 //$NON-NLS-1$
 		}
@@ -1139,6 +1163,10 @@ public class CompilerOptions {
 		optionsMap.put(OPTION_SyntacticNullAnalysisForFields, this.enableSyntacticNullAnalysisForFields ? ENABLED : DISABLED);
 		optionsMap.put(OPTION_InheritNullAnnotations, this.inheritNullAnnotations ? ENABLED : DISABLED);
 		optionsMap.put(OPTION_ReportNonnullParameterAnnotationDropped, getSeverityString(NonnullParameterAnnotationDropped));
+		// GROOVY start
+		// if not supplied here it isn't seen as something that can be set from elsewhere
+		optionsMap.put(OPTIONG_GroovyTransformsToRunOnReconcile,"");
+		// GROOVY end
 		return optionsMap;
 	}
 
@@ -1757,7 +1785,75 @@ public class CompilerOptions {
 				this.storeAnnotations = false;
 			}
 		}
+		// GROOVY start
+		if ((optionValue = optionsMap.get(OPTIONG_BuildGroovyFiles)) != null) {
+			if (ENABLED.equals(optionValue)) {
+				this.buildGroovyFiles = 2;
+				this.storeAnnotations = true; // force it on
+				// will need proper bit manipulation when second flag comes up
+				String s = (String)optionsMap.get(OPTIONG_GroovyFlags);
+				if (s!=null && s.equals("1")) { //$NON-NLS-1$
+					this.groovyFlags = 0x01;
+				} else {
+					this.groovyFlags = 0;
+				}
+			} else if (DISABLED.equals(optionValue)) {
+				this.buildGroovyFiles = 1;
+				this.groovyFlags = 0;
+			}
+		}
+		if ((optionValue = optionsMap.get(OPTIONG_GroovyClassLoaderPath)) != null) {
+			this.groovyClassLoaderPath = (String)optionValue;
+		}
+		if ((optionValue = optionsMap.get(OPTIONG_GroovyExtraImports)) != null) {
+			this.groovyExtraImports = (String)optionValue;
+		} else {
+			if (sysPropConfiguredExtraImports!=null && this.groovyExtraImports == null) {
+				this.groovyExtraImports = sysPropConfiguredExtraImports;
+			}
+		}
+		if ((optionValue = optionsMap.get(OPTIONG_GroovyCustomizerClassesList)) != null) {
+			this.groovyCustomizerClassesList = (String)optionValue;
+		} else {
+			if (sysPropConfiguredCustomizerClassesList!=null && this.groovyCustomizerClassesList == null) {
+				this.groovyCustomizerClassesList = sysPropConfiguredCustomizerClassesList;
+			}
+		}
+		optionValue = optionsMap.get(OPTIONG_GroovyTransformsToRunOnReconcile);
+		if (optionValue!=null && ((String)optionValue).length()!=0) {
+			this.groovyTransformsToRunOnReconcile = (String)optionValue;
+		} else {
+			if (sysPropConfiguredGroovyTransforms!=null) {
+				this.groovyTransformsToRunOnReconcile = sysPropConfiguredGroovyTransforms;
+			}
+		}
+		if ((optionValue = optionsMap.get(OPTIONG_GroovyProjectName)) != null) {
+			this.groovyProjectName = (String)optionValue;
+		}
+		// GROOVY end
 	}
+	
+	static String sysPropConfiguredCustomizerClassesList = null;
+	static String sysPropConfiguredExtraImports = null;
+	static String sysPropConfiguredGroovyTransforms = null;
+	static {
+		try {
+			sysPropConfiguredExtraImports = System.getProperty("greclipse.extraimports");
+		} catch (Exception e) {
+			sysPropConfiguredExtraImports= null;
+		}
+		try {
+			sysPropConfiguredGroovyTransforms = System.getProperty("greclipse.transformsDuringReconcile");
+		} catch (Exception e) {
+			sysPropConfiguredGroovyTransforms= null;
+		}
+		try {
+			sysPropConfiguredCustomizerClassesList = System.getProperty("greclipse.customizerClassesList");
+		} catch (Exception e) {
+			sysPropConfiguredCustomizerClassesList= null;
+		}
+	}
+	
 	public String toString() {
 		StringBuffer buf = new StringBuffer("CompilerOptions:"); //$NON-NLS-1$
 		buf.append("\n\t- local variables debug attributes: ").append((this.produceDebugAttributes & ClassFileConstants.ATTR_VARS) != 0 ? "ON" : " OFF"); //$NON-NLS-1$ //$NON-NLS-2$ //$NON-NLS-3$
@@ -1865,6 +1961,15 @@ public class CompilerOptions {
 		buf.append("\n\t- resource may not be closed: ").append(getSeverityString(PotentiallyUnclosedCloseable)); //$NON-NLS-1$
 		buf.append("\n\t- resource should be handled by try-with-resources: ").append(getSeverityString(ExplicitlyClosedAutoCloseable)); //$NON-NLS-1$
 		buf.append("\n\t- Unused Type Parameter: ").append(getSeverityString(UnusedTypeParameter)); //$NON-NLS-1$
+		
+		// GROOVY start
+		buf.append("\n\t- build groovy files: ").append((this.buildGroovyFiles==0)?"dontknow":(this.buildGroovyFiles==1?"no":"yes")); //$NON-NLS-1$ //$NON-NLS-2$ //$NON-NLS-3$ //$NON-NLS-4$
+		buf.append("\n\t- build groovy flags: ").append(Integer.toHexString(this.groovyFlags)); //$NON-NLS-1$
+		buf.append("\n\t- groovyclassloader path: ").append(this.groovyClassLoaderPath); //$NON-NLS-1$
+		buf.append("\n\t- groovy projectname: ").append(this.groovyProjectName); //$NON-NLS-1$
+		buf.append("\n\t- groovy extra imports: ").append(this.groovyExtraImports); //$NON-NLS-1$
+		buf.append("\n\t- groovy customizer classes list: ").append(this.groovyCustomizerClassesList); //$NON-NLS-1$
+		// GROOVY end
 		return buf.toString();
 	}
 	
