@@ -23,7 +23,6 @@
  *								bug 409473 - [compiler] JDT cannot compile against JRE 1.8
  *								Bug 420080 - [1.8] Overridden Default method is reported as duplicated
  *								Bug 404690 - [1.8][compiler] revisit bridge generation after VM bug is fixed
- *								Bug 410325 - [1.7][compiler] Generified method override different between javac and eclipse compiler
  *								Bug 429958 - [1.8][null] evaluate new DefaultLocation attribute of @NonNullByDefault
  *								Bug 390889 - [1.8][compiler] Evaluate options to support 1.7- projects against 1.8 JRE.
  *								Bug 440773 - [1.8][null]DefaultLocation.RETURN_TYPE erroneously affects method parameters in @NonNullByDefault
@@ -692,8 +691,6 @@ void checkMethods() {
  * mark as isOverridden
  * - any skippable method as defined above iff it is actually overridden by the specific method (disregarding visibility etc.)
  * Note, that 'idx' corresponds to the position of 'general' in the arrays 'skip' and 'isOverridden'
- * TODO(stephan) currently (as of Bug 410325), the boarder between skip and isOverridden is blurred,
- *                should reassess after more experience with this patch.
  */
 boolean isSkippableOrOverridden(MethodBinding specific, MethodBinding general, boolean[] skip, boolean[] isOverridden, boolean[] isInherited, int idx) {
 	boolean specificIsInterface = specific.declaringClass.isInterface();
@@ -709,9 +706,9 @@ boolean isSkippableOrOverridden(MethodBinding specific, MethodBinding general, b
 			return true;
 		}
 	} else if (specificIsInterface == generalIsInterface) { 
-		if (specific.declaringClass.isCompatibleWith(general.declaringClass) && isMethodSubsignature(specific, general)) {
+		if (isParameterSubsignature(specific, general)) {
 			skip[idx] = true;
-			isOverridden[idx] = true;
+			isOverridden[idx] = specific.declaringClass.isCompatibleWith(general.declaringClass);
 			return true;
 		}
 	}

@@ -52,7 +52,7 @@ public class SignatureWrapper {
 		}
 
 		if (this.use15specifics || this.end != this.bracket) {
-			this.start = this.end + 1; // skip ';'
+		this.start = this.end + 1; // skip ';'
 		} else {
 			this.start = skipAngleContents(this.end) + 1;  // skip <<>*>;
 			this.bracket = -1;

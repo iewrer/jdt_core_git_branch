@@ -9,6 +9,7 @@
  *     IBM Corporation - initial API and implementation
  *******************************************************************************/
 package org.eclipse.jdt.internal.core.builder;
+// GROOVY PATCHED
 
 import org.eclipse.core.resources.IFile;
 import org.eclipse.core.runtime.IPath;
@@ -114,4 +115,18 @@ public String toString() {
 	return "SourceFile[" //$NON-NLS-1$
 		+ this.resource.getFullPath() + "]";  //$NON-NLS-1$
 }
+
+// GROOVY - GRECLIPSE-963
+public static final String LINK_TO_GRAILS_PLUGINS = ".link_to_grails_plugins"; //$NON-NLS-1$
+
+public boolean isInLinkedSourceFolder() {
+	if (this.sourceLocation!=null &&  this.sourceLocation.sourceFolder!=null) {
+		IPath fullPath = this.sourceLocation.sourceFolder.getFullPath();
+		if (fullPath!=null) {
+			return LINK_TO_GRAILS_PLUGINS.equals(fullPath.segment(1));
+		}
+	}
+	return false;
+}
+// GROOVY - end
 }

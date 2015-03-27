@@ -12,6 +12,7 @@
  *     						Bug 346010 - [model] strange initialization dependency in OptionTests
  *******************************************************************************/
 package org.eclipse.jdt.internal.core;
+// GROOVY PATCHED
 
 import java.io.*;
 import java.net.URI;
@@ -27,6 +28,8 @@ import java.util.Map;
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.parsers.ParserConfigurationException;
+
+import org.codehaus.jdt.groovy.integration.LanguageSupportFactory;
 import org.eclipse.core.resources.ICommand;
 import org.eclipse.core.resources.IFile;
 import org.eclipse.core.resources.IFolder;
@@ -488,6 +491,9 @@ public class JavaProject
 				}
 			}
 		}
+		// GROOVY start
+		LanguageSupportFactory.getEventHandler().handle(this,"close");
+		// GROOVY end
 		super.close();
 	}
 
@@ -1655,7 +1661,7 @@ public class JavaProject
 	 */
 	public String getOption(String optionName, boolean inheritJavaCoreOptions) {
 		return JavaModelManager.getJavaModelManager().getOption(optionName, inheritJavaCoreOptions, getEclipsePreferences());
-	}
+		}
 
 	/**
 	 * @see org.eclipse.jdt.core.IJavaProject#getOptions(boolean)
@@ -1701,6 +1707,7 @@ public class JavaProject
 						}
 					}
 				}
+				
 				// cache project options
 				perProjectInfo.options = projectOptions;
 			}
@@ -2951,12 +2958,12 @@ public class JavaProject
 
 		// Write changes
 		if (modified) {
-			try {
-				projectPreferences.flush();
-			} catch (BackingStoreException e) {
-				// problem with pref store - quietly ignore
-			}
+		try {
+			projectPreferences.flush();
+		} catch (BackingStoreException e) {
+			// problem with pref store - quietly ignore
 		}
+	}
 	}
 
 	/**

@@ -8,9 +8,9 @@
  * Contributors:
  *     IBM Corporation - initial API and implementation
  *     Benjamin Muskalla - Contribution for bug 239066
- *     Stephan Herrmann  - Contributions for
+ *     Stephan Herrmann  - Contributions for 
  *	     						bug 236385 - [compiler] Warn for potential programming problem if an object is created but not used
- *  	   						bug 338303 - Warning about Redundant assignment conflicts with definite assignment
+ *     						bug 338303 - Warning about Redundant assignment conflicts with definite assignment
  *								bug 349326 - [1.7] new warning for missing try-with-resources
  *								bug 186342 - [compiler][null] Using annotations for null checking
  *								bug 365519 - editorial cleanup after bug 186342 and bug 365387
@@ -65,6 +65,7 @@
  *								Bug 416182 - [1.8][compiler][null] Contradictory null annotations not rejected
  ********************************************************************************/
 package org.eclipse.jdt.internal.compiler.problem;
+// GROOVY PATCHED
 
 import java.io.CharConversionException;
 import java.io.PrintWriter;
@@ -132,7 +133,7 @@ import org.eclipse.jdt.internal.compiler.ast.Reference;
 import org.eclipse.jdt.internal.compiler.ast.ReferenceExpression;
 import org.eclipse.jdt.internal.compiler.ast.ReturnStatement;
 import org.eclipse.jdt.internal.compiler.ast.SingleNameReference;
-import org.eclipse.jdt.internal.compiler.ast.Statement;
+import org.eclipse.jdt.internal.compiler.ast.Statement; 
 import org.eclipse.jdt.internal.compiler.ast.SwitchStatement;
 import org.eclipse.jdt.internal.compiler.ast.ThisReference;
 import org.eclipse.jdt.internal.compiler.ast.TypeDeclaration;
@@ -563,7 +564,7 @@ public static int getIrritant(int problemID) {
 			
 		case IProblem.MethodCanBePotentiallyStatic:
 			return CompilerOptions.MethodCanBePotentiallyStatic;
-
+				
 		case IProblem.UnclosedCloseable:
 		case IProblem.UnclosedCloseableAtExit:
 			return CompilerOptions.UnclosedCloseable;
@@ -659,7 +660,7 @@ public static int getProblemCategory(int severity, int problemID) {
 			case CompilerOptions.UnhandledWarningToken :
 			case CompilerOptions.UnusedWarningToken :
 			case CompilerOptions.UnusedLabel :
-			case CompilerOptions.RedundantSuperinterface :
+			case CompilerOptions.RedundantSuperinterface :	
 			case CompilerOptions.RedundantSpecificationOfTypeArguments :
 			case CompilerOptions.UnusedTypeParameter:
 				return CategorizedProblem.CAT_UNNECESSARY_CODE;
@@ -686,7 +687,7 @@ public static int getProblemCategory(int severity, int problemID) {
 			case CompilerOptions.ForbiddenReference :
 			case CompilerOptions.DiscouragedReference :
 				return CategorizedProblem.CAT_RESTRICTION;
-
+			
 			case CompilerOptions.NullSpecViolation :
 			case CompilerOptions.NullAnnotationInferenceConflict :
 			case CompilerOptions.NullUncheckedConversion :
@@ -796,6 +797,12 @@ public void abstractMethodInConcreteClass(SourceTypeBinding type) {
 	}
 }
 public void abstractMethodMustBeImplemented(SourceTypeBinding type, MethodBinding abstractMethod) {
+    // GROOVY start: fired off by method verifier
+	if (type.scope!=null && !type.scope.shouldReport(IProblem.IncompatibleReturnType)) {
+		return;
+	}
+	// GROOVY end
+
 	if (type.isEnum() && type.isLocalType()) {
 		FieldBinding field = type.scope.enclosingMethodScope().initializedField;
 		FieldDeclaration decl = field.sourceField();
@@ -1282,9 +1289,9 @@ public void cannotReadSource(CompilationUnitDeclaration unit, AbortCompilationUn
 		stringWriter = new StringWriter();
 		writer = new PrintWriter(stringWriter);
 	}
-	writer.print(abortException.exception.getClass().getName());
-	writer.print(':');
-	writer.print(abortException.exception.getMessage());
+		writer.print(abortException.exception.getClass().getName());
+		writer.print(':');
+		writer.print(abortException.exception.getMessage());
 	String exceptionTrace = stringWriter.toString();
 	String[] arguments = new String[]{ fileName, exceptionTrace };
 	this.handle(
@@ -3162,6 +3169,14 @@ public void incompatibleExceptionInThrowsClause(SourceTypeBinding type, MethodBi
 			type.sourceEnd());
 }
 public void incompatibleReturnType(MethodBinding currentMethod, MethodBinding inheritedMethod) {
+    // GROOVY start: fired off by method verifier
+	if (currentMethod.declaringClass instanceof SourceTypeBinding) {
+		SourceTypeBinding stb = (SourceTypeBinding)currentMethod.declaringClass;
+		if (stb.scope!=null && !stb.scope.shouldReport(IProblem.IncompatibleReturnType)) {
+			return;
+		}
+	}
+	// GROOVY end
 	StringBuffer methodSignature = new StringBuffer();
 	methodSignature
 		.append(inheritedMethod.declaringClass.readableName())
@@ -3281,7 +3296,7 @@ public void incorrectSwitchType(Expression expression, TypeBinding testType) {
 					expression.sourceEnd);
 		} else {
 			if (this.options.sourceLevel < ClassFileConstants.JDK1_5 && testType.isEnum()) {
-				this.handle(
+	this.handle(
 						IProblem.SwitchOnEnumNotBelow15,
 						new String[] {new String(testType.readableName())},
 						new String[] {new String(testType.shortReadableName())},
@@ -3289,12 +3304,12 @@ public void incorrectSwitchType(Expression expression, TypeBinding testType) {
 						expression.sourceEnd);
 			} else {
 				this.handle(
-						IProblem.IncorrectSwitchType,
-						new String[] {new String(testType.readableName())},
-						new String[] {new String(testType.shortReadableName())},
-						expression.sourceStart,
-						expression.sourceEnd);
-			}
+		IProblem.IncorrectSwitchType,
+		new String[] {new String(testType.readableName())},
+		new String[] {new String(testType.shortReadableName())},
+		expression.sourceStart,
+		expression.sourceEnd);
+}
 		}
 	} else {
 		this.handle(
@@ -5698,7 +5713,7 @@ public boolean expressionNonNullComparison(Expression expr, boolean checkForNull
 			expr = ((CastExpression) expr).expression;
 		else
 			break;
-	}
+}
 	// check all those kinds of expressions that can possible answer NON_NULL from nullStatus():
 	if (expr instanceof MessageSend) {
 		problemId = checkForNull 
@@ -5932,6 +5947,14 @@ public void methodMustOverride(AbstractMethodDeclaration method, long compliance
 }
 
 public void methodNameClash(MethodBinding currentMethod, MethodBinding inheritedMethod, int severity) {
+    // GROOVY start: fired off by method verifier
+	if (currentMethod.declaringClass instanceof SourceTypeBinding) {
+		SourceTypeBinding stb = (SourceTypeBinding)currentMethod.declaringClass;
+		if (stb.scope!=null && !stb.scope.shouldReport(IProblem.MethodNameClash)) {
+			return;
+		}
+	}
+	// GROOVY end
 	this.handle(
 		IProblem.MethodNameClash,
 		new String[] {
@@ -6100,12 +6123,12 @@ public void missingEnumConstantCase(SwitchStatement switchStatement, FieldBindin
 }
 public void missingDefaultCase(SwitchStatement switchStatement, boolean isEnumSwitch, TypeBinding expressionType) {
 	if (isEnumSwitch) {
-		this.handle(
+	this.handle(
 				IProblem.MissingEnumDefaultCase,
-				new String[] {new String(expressionType.readableName())},
-				new String[] {new String(expressionType.shortReadableName())},
-				switchStatement.expression.sourceStart,
-				switchStatement.expression.sourceEnd);
+		new String[] {new String(expressionType.readableName())},
+		new String[] {new String(expressionType.shortReadableName())},
+		switchStatement.expression.sourceStart,
+		switchStatement.expression.sourceEnd);
 	} else {
 		this.handle(
 				IProblem.MissingDefaultCase,
@@ -6113,7 +6136,7 @@ public void missingDefaultCase(SwitchStatement switchStatement, boolean isEnumSw
 				NoArgument,
 				switchStatement.expression.sourceStart,
 				switchStatement.expression.sourceEnd);
-	}
+}
 }
 public void missingOverrideAnnotation(AbstractMethodDeclaration method) {
 	int severity = computeSeverity(IProblem.MissingOverrideAnnotation);
@@ -7918,12 +7941,12 @@ private String typesAsString(MethodBinding methodBinding, TypeBinding[] paramete
 	if (methodBinding.isPolymorphic()) {
 		// get the original polymorphicMethod method
 		TypeBinding[] types = methodBinding.original().parameters;
-		StringBuffer buffer = new StringBuffer(10);
-		for (int i = 0, length = types.length; i < length; i++) {
-			if (i != 0) {
-				buffer.append(", "); //$NON-NLS-1$
-			}
-			TypeBinding type = types[i];
+	StringBuffer buffer = new StringBuffer(10);
+	for (int i = 0, length = types.length; i < length; i++) {
+		if (i != 0) {
+			buffer.append(", "); //$NON-NLS-1$
+		}
+		TypeBinding type = types[i];
 			boolean isVarargType = i == length-1;
 			if (isVarargType) {
 				type = ((ArrayBinding)type).elementsType();
@@ -7931,7 +7954,7 @@ private String typesAsString(MethodBinding methodBinding, TypeBinding[] paramete
 			if (showNullAnnotations)
 				buffer.append(new String(type.nullAnnotatedReadableName(this.options, makeShort)));
 			else
-				buffer.append(new String(makeShort ? type.shortReadableName() : type.readableName()));
+			buffer.append(new String(makeShort ? type.shortReadableName() : type.readableName()));
 			if (isVarargType) {
 				buffer.append("..."); //$NON-NLS-1$
 			}
@@ -7957,7 +7980,7 @@ private String typesAsString(MethodBinding methodBinding, TypeBinding[] paramete
 		}
 	}
 	return buffer.toString();
-}
+	}
 private String typesAsString(TypeBinding[] types, boolean makeShort) {
 	return typesAsString(types, makeShort, false);
 }
@@ -7975,7 +7998,6 @@ private String typesAsString(TypeBinding[] types, boolean makeShort, boolean sho
 	}
 	return buffer.toString();
 }
-
 public void undefinedAnnotationValue(TypeBinding annotationType, MemberValuePair memberValuePair) {
 	if (isRecoveredName(memberValuePair.name)) return;
 	String name = 	new String(memberValuePair.name);
@@ -8068,8 +8090,8 @@ public void unhandledExceptionFromAutoClose (TypeBinding exceptionType, ASTNode 
 					new String(exceptionType.shortReadableName()),
 					new String(localBinding.shortReadableName())},
 			location.sourceStart,
-			location.sourceEnd);
-	}
+		location.sourceEnd);
+}
 }
 public void unhandledWarningToken(Expression token) {
 	String[] arguments = new String[] { token.constant.stringValue() };
@@ -8444,9 +8466,15 @@ public void unsafeReturnTypeOverride(MethodBinding currentMethod, MethodBinding 
 	int start = type.sourceStart();
 	int end = type.sourceEnd();
 	if (TypeBinding.equalsEquals(currentMethod.declaringClass, type)) {
-		ASTNode location = ((MethodDeclaration) currentMethod.sourceMethod()).returnType;
-		start = location.sourceStart();
-		end = location.sourceEnd();
+		// GROOVY - @Delegate introduced methods don't have a source method (GROOVY-873)
+		if (currentMethod.sourceMethod()!=null) {
+		// GRECLIPSE - end
+			ASTNode location = ((MethodDeclaration) currentMethod.sourceMethod()).returnType;
+			start = location.sourceStart();
+			end = location.sourceEnd();
+		// GROOVY - start
+		}
+		// GROOVY - end
 	}
 	this.handle(
 			IProblem.UnsafeReturnTypeOverride,
@@ -8614,7 +8642,7 @@ public void unusedPrivateConstructor(ConstructorDeclaration constructorDecl) {
 
 	int severity = computeSeverity(IProblem.UnusedPrivateConstructor);
 	if (severity == ProblemSeverities.Ignore) return;
-	
+
 	if (excludeDueToAnnotation(constructorDecl.annotations, IProblem.UnusedPrivateConstructor)) return;
 	
 	MethodBinding constructor = constructorDecl.binding;
@@ -8659,7 +8687,7 @@ public void unusedPrivateField(FieldDeclaration fieldDecl) {
 		if (referenceBinding != null) {
 			if (referenceBinding.findSuperTypeOriginatingFrom(TypeIds.T_JavaIoSerializable, false /*Serializable is not a class*/) != null) {
 				return; // do not report unused serialVersionUID field for class that implements Serializable
-			}
+	}
 		}
 	}
 	if (excludeDueToAnnotation(fieldDecl.annotations, IProblem.UnusedPrivateField)) return;
@@ -8887,6 +8915,17 @@ public void varargsArgumentNeedCast(MethodBinding method, TypeBinding argumentTy
 	}
 }
 public void varargsConflict(MethodBinding method1, MethodBinding method2, SourceTypeBinding type) {
+	// GROOVY - start (GRE925)
+	// Groovy 'guesses' about varargs rather than remembering from the declaration *sigh*
+	ReferenceBinding rb1 = method1.declaringClass;
+	ReferenceBinding rb2 = method2.declaringClass;
+	if (rb1!=null && (rb1 instanceof SourceTypeBinding) && ((SourceTypeBinding)rb1).scope!=null && !((SourceTypeBinding)rb1).scope.shouldReport(IProblem.VarargsConflict)) { 
+		return;
+	}
+	if (rb2!=null && (rb2 instanceof SourceTypeBinding) && ((SourceTypeBinding)rb2).scope!=null && !((SourceTypeBinding)rb2).scope.shouldReport(IProblem.VarargsConflict)) { 
+		return;
+	}
+	// GROOVY - end
 	this.handle(
 		IProblem.VarargsConflict,
 		new String[] {
@@ -9059,7 +9098,6 @@ public void wrongSequenceOfExceptionTypes(TypeReference typeRef, TypeBinding exc
 		typeRef.sourceStart,
 		typeRef.sourceEnd);
 }
-
 public void autoManagedResourcesNotBelow17(LocalDeclaration[] resources) {
 	this.handle(
 			IProblem.AutoManagedResourceNotBelow17,
@@ -9183,9 +9221,9 @@ public void nullityMismatch(Expression expression, TypeBinding providedType, Typ
 			var = ((Reference)expression).lastFieldBinding();
 		}
 		if (var != null && var.isNullable()) {
-			nullityMismatchSpecdNullable(expression, requiredType, annotationName);
-			return;
-		}
+					nullityMismatchSpecdNullable(expression, requiredType, annotationName);
+					return;
+				}
 		nullityMismatchPotentiallyNull(expression, requiredType, annotationName);
 		return;
 	}

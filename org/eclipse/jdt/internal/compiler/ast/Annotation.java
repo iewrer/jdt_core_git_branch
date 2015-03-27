@@ -4,7 +4,7 @@
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
  * http://www.eclipse.org/legal/epl-v10.html
- * 
+ *
  * Contributors:
  *     IBM Corporation - initial API and implementation
  *     Stephan Herrmann - Contributions for
@@ -32,6 +32,7 @@
  *                          Bug 419209 - [1.8] Repeating container annotations should be rejected in the presence of annotation it contains
  *******************************************************************************/
 package org.eclipse.jdt.internal.compiler.ast;
+// GROOVY PATCHED
 
 import java.util.Stack;
 
@@ -958,6 +959,9 @@ public abstract class Annotation extends Expression {
 		}
 		return this.resolvedType;
 	}
+			// GROOVY start
+			if (scope.compilationUnitScope().checkTargetCompatibility()) {
+			// GROOVY end
 
 	static boolean isAnnotationTargetAllowed(Annotation annotation, BlockScope scope, TypeBinding annotationType, int kind) {
 		long metaTagBits = annotationType.getAnnotationTagBits(); // could be forward reference
@@ -1073,9 +1077,9 @@ public abstract class Annotation extends Expression {
 		}
 		if (! isAnnotationTargetAllowed(annotation, scope, annotationType, kind)) {
 			scope.problemReporter().disallowedTargetForAnnotation(annotation);
+				// GROOVY start
 		}
 	}
-
 	/**
 	 * Check to see if a repeating annotation is in fact of a container annotation type for an annotation which is also present at the same target.
 	 * @param scope The scope (for error reporting)

@@ -4,7 +4,7 @@
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
  * http://www.eclipse.org/legal/epl-v10.html
- * 
+ *
  * Contributors:
  *     IBM Corporation - initial API and implementation
  *     Stephan Herrmann - Contribution for
@@ -28,6 +28,7 @@
  *                          Bug 415399 - [1.8][compiler] Type annotations on constructor results dropped by the code generator
  *******************************************************************************/
 package org.eclipse.jdt.internal.compiler.ast;
+// GROOVY PATCHED
 
 import java.util.ArrayList;
 import java.util.List;
@@ -47,6 +48,7 @@ import org.eclipse.jdt.internal.compiler.lookup.BlockScope;
 import org.eclipse.jdt.internal.compiler.lookup.ClassScope;
 import org.eclipse.jdt.internal.compiler.lookup.LocalVariableBinding;
 import org.eclipse.jdt.internal.compiler.lookup.LookupEnvironment;
+import org.eclipse.jdt.internal.compiler.lookup.CompilationUnitScope;
 import org.eclipse.jdt.internal.compiler.lookup.ProblemReasons;
 import org.eclipse.jdt.internal.compiler.lookup.ProblemReferenceBinding;
 import org.eclipse.jdt.internal.compiler.lookup.ReferenceBinding;
@@ -536,6 +538,14 @@ protected void reportDeprecatedType(TypeBinding type, Scope scope) {
 }
 
 protected void reportInvalidType(Scope scope) {
+	// GROOVY start: don't report this, let groovy do it
+	if (scope!=null) {
+		CompilationUnitScope cuScope = scope.compilationUnitScope();
+		if (!cuScope.reportInvalidType(this, this.resolvedType)) {
+			return;
+		}
+	}
+	// GROOVY end
 	scope.problemReporter().invalidType(this, this.resolvedType);
 }
 

@@ -9,12 +9,14 @@
  *     IBM Corporation - initial API and implementation
  *******************************************************************************/
 package org.eclipse.jdt.internal.core.search.indexing;
+// GROOVY PATCHED
 
 import java.io.*;
 import java.net.URL;
 import java.util.*;
 import java.util.zip.CRC32;
 
+import org.codehaus.jdt.groovy.integration.LanguageSupportFactory;
 import org.eclipse.core.resources.*;
 import org.eclipse.core.runtime.IPath;
 import org.eclipse.core.runtime.IProgressMonitor;
@@ -75,8 +77,7 @@ public class IndexManager extends JobManager implements IIndexConstants {
 	// Debug
 	public static boolean DEBUG = false;
 
-
-public synchronized void aboutToUpdateIndex(IPath containerPath, Integer newIndexState) {
+	public synchronized void aboutToUpdateIndex(IPath containerPath, Integer newIndexState) {
 	// newIndexState is either UPDATING_STATE or REBUILDING_STATE
 	// must tag the index as inconsistent, in case we exit before the update job is started
 	IndexLocation indexLocation = computeIndexLocation(containerPath);
@@ -226,13 +227,25 @@ public SourceElementParser getSourceElementParser(IJavaProject project, ISourceE
 	Map options = project.getOptions(true);
 	options.put(JavaCore.COMPILER_TASK_TAGS, ""); //$NON-NLS-1$
 
-	SourceElementParser parser = new IndexingParser(
-		requestor,
-		new DefaultProblemFactory(Locale.getDefault()),
-		new CompilerOptions(options),
-		true, // index local declarations
-		true, // optimize string literals
-		false); // do not use source javadoc parser to speed up parsing
+    // GROOVY start
+    /* old {
+		SourceElementParser parser = new IndexingParser(
+				requestor,
+				new DefaultProblemFactory(Locale.getDefault()),
+				new CompilerOptions(options),
+				true, // index local declarations
+				true, // optimize string literals
+				false); // do not use source javadoc parser to speed up parsing
+    } new */
+	SourceElementParser parser = LanguageSupportFactory.getIndexingParser(
+			requestor,
+			new DefaultProblemFactory(Locale.getDefault()),
+			new CompilerOptions(options),
+			true, // index local declarations
+			true, // optimize string literals
+			false); // do not use source javadoc parser to speed up parsing
+	// GROOVY end
+	
 	parser.reportOnlyOneSyntaxError = true;
 
 	// Always check javadoc while indexing
@@ -319,7 +332,7 @@ public synchronized Index getIndex(IPath containerPath, IndexLocation indexLocat
 					rebuildIndex(indexLocation, containerPath, true);
 				}
 				return null;
-			}
+		}
 		}
 		// index wasn't found on disk, consider creating an empty new one
 		if (createIfMissing) {
@@ -383,18 +396,18 @@ public Index[] getIndexes(IndexLocation[] locations, IProgressMonitor progressMo
 				}
 			} else {
 				if (indexLocation.isParticipantIndex() && indexLocation.exists()) { // the index belongs to non-jdt search participant
-					try {
-						IPath container = getParticipantsContainer(indexLocation);
-						if (container != null) {
+						try {
+							IPath container = getParticipantsContainer(indexLocation);
+							if (container != null) {
 							index = new Index(indexLocation, container.toOSString(), true /*reuse index file*/);
-							this.indexes.put(indexLocation, index);
+								this.indexes.put(indexLocation, index);
+							}
+						} catch (IOException e) {
+							// ignore
 						}
-					} catch (IOException e) {
-						// ignore
-					}
+					} 
 				}
 			}
-		}
 		if (index != null)
 			locatedIndexes[count++] = index; // only consider indexes which are ready
 	}
@@ -1124,7 +1137,7 @@ private synchronized void updateIndexState(IndexLocation indexLocation, Integer 
 public void updateParticipant(IPath indexPath, IPath containerPath) {
 	if (this.participantsContainers == null) {
 		readParticipantsIndexNamesFile();
-	}
+	} 
 	IndexLocation indexLocation = new FileIndexLocation(indexPath.toFile(), true);
 	if (this.participantsContainers.get(indexLocation) == null) {
 		this.participantsContainers.put(indexLocation, containerPath);

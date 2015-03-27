@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 2005, 2014 IBM Corporation and others.
+ * Copyright (c) 2005, 2013 IBM Corporation and others.
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
@@ -15,7 +15,6 @@
  *								Bug 392099 - [1.8][compiler][null] Apply null annotation on types for null analysis
  *								Bug 415291 - [1.8][null] differentiate type incompatibilities due to null annotations
  *								Bug 415043 - [1.8][null] Follow-up re null type annotations after bug 392099
- *								Bug 412076 - [compiler] @NonNullByDefault doesn't work for varargs parameter when in generic interface
  *								Bug 403216 - [1.8][null] TypeReference#captureTypeAnnotations treats type annotations as type argument annotations
  *								Bug 415850 - [1.8] Ensure RunJDTCoreTests can cope with null annotations enabled
  *								Bug 415043 - [1.8][null] Follow-up re null type annotations after bug 392099

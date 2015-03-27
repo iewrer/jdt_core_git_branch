@@ -43,8 +43,6 @@
  *     Andy Clement (GoPivotal, Inc) aclement@gopivotal.com - Contributions for
  *                          Bug 383624 - [1.8][compiler] Revive code generation support for type annotations (from Olivier's work)
  *                          Bug 409245 - [1.8][compiler] Type annotations dropped when call is routed through a synthetic bridge method
- *     Till Brychcy - Contributions for
- *     						bug 413460 - NonNullByDefault is not inherited to Constructors when accessed via Class File
  *******************************************************************************/
 package org.eclipse.jdt.internal.compiler.ast;
 
@@ -57,7 +55,6 @@ import org.eclipse.jdt.internal.compiler.ASTVisitor;
 import org.eclipse.jdt.internal.compiler.classfmt.ClassFileConstants;
 import org.eclipse.jdt.internal.compiler.codegen.*;
 import org.eclipse.jdt.internal.compiler.flow.*;
-import org.eclipse.jdt.internal.compiler.impl.CompilerOptions;
 import org.eclipse.jdt.internal.compiler.impl.Constant;
 import org.eclipse.jdt.internal.compiler.lookup.*;
 import org.eclipse.jdt.internal.compiler.problem.ProblemSeverities;
@@ -488,10 +485,7 @@ public TypeBinding resolveType(BlockScope scope) {
 	if (!isDiamond && this.resolvedType.isParameterizedTypeWithActualArguments()) {
  		checkTypeArgumentRedundancy((ParameterizedTypeBinding) this.resolvedType, scope);
  	}
-	if (compilerOptions.isAnnotationBasedNullAnalysisEnabled && (this.binding.tagBits & TagBits.IsNullnessKnown) == 0) {
-		new ImplicitNullAnnotationVerifier(scope.environment(), compilerOptions.inheritNullAnnotations)
-				.checkImplicitNullAnnotations(this.binding, null/*srcMethod*/, false, scope);
-	}
+		
 	return this.resolvedType;
 }
 

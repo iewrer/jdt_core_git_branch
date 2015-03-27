@@ -38,7 +38,7 @@ public abstract class SourceMethodElementInfo extends AnnotatableInfo implements
 	 * For example, Hashtable or java.util.Hashtable.
 	 */
 	protected char[][] exceptionTypes;
-	
+
 	protected ILocalVariable[] arguments;
 
 	/*

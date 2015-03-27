@@ -11,10 +11,12 @@
  *                                                            (see https://bugs.eclipse.org/bugs/show_bug.cgi?id=71460)
  *******************************************************************************/
 package org.eclipse.jdt.internal.core;
+// GROOVY PATCHED
 
 import java.io.IOException;
 import java.util.*;
 
+import org.codehaus.jdt.groovy.integration.LanguageSupportFactory;
 import org.eclipse.core.resources.*;
 import org.eclipse.core.runtime.*;
 import org.eclipse.jdt.core.*;
@@ -585,7 +587,13 @@ public IJavaElement findSharedWorkingCopy(IBufferFactory factory) {
  * @see ICompilationUnit#findWorkingCopy(WorkingCopyOwner)
  */
 public ICompilationUnit findWorkingCopy(WorkingCopyOwner workingCopyOwner) {
+    // GROOVY start
+    /* old {
 	CompilationUnit cu = new CompilationUnit((PackageFragment)this.parent, getElementName(), workingCopyOwner);
+    } new */
+    CompilationUnit cu = LanguageSupportFactory.newCompilationUnit((PackageFragment)this.parent, getElementName(), workingCopyOwner);
+    // GROOVY end
+	
 	if (workingCopyOwner == DefaultWorkingCopyOwner.PRIMARY) {
 		return cu;
 	} else {
@@ -884,7 +892,12 @@ public ICompilationUnit getPrimary() {
  */
 public IJavaElement getPrimaryElement(boolean checkOwner) {
 	if (checkOwner && isPrimary()) return this;
+    // GROOVY start
+    /* old {
 	return new CompilationUnit((PackageFragment)getParent(), getElementName(), DefaultWorkingCopyOwner.PRIMARY);
+    } new */
+	return LanguageSupportFactory.newCompilationUnit((PackageFragment)getParent(), getElementName(), DefaultWorkingCopyOwner.PRIMARY);
+    // GROOVY end
 }
 /*
  * @see Openable#resource(PackageFragmentRoot)
@@ -975,7 +988,12 @@ public ICompilationUnit getWorkingCopy(WorkingCopyOwner workingCopyOwner, IProbl
 
 	JavaModelManager manager = JavaModelManager.getJavaModelManager();
 
+	// GROOVY start
+    /* old {
 	CompilationUnit workingCopy = new CompilationUnit((PackageFragment)getParent(), getElementName(), workingCopyOwner);
+    } new */
+    CompilationUnit workingCopy = LanguageSupportFactory.newCompilationUnit((PackageFragment)getParent(), getElementName(), workingCopyOwner);
+    // GROOVY end
 	JavaModelManager.PerWorkingCopyInfo perWorkingCopyInfo =
 		manager.getPerWorkingCopyInfo(workingCopy, false/*don't create*/, true/*record usage*/, null/*not used since don't create*/);
 	if (perWorkingCopyInfo != null) {
@@ -1127,7 +1145,12 @@ protected IBuffer openBuffer(IProgressMonitor pm, Object info) throws JavaModelE
 	if (isWorkingCopy) {
 		// ensure that isOpen() is called outside the bufManager synchronized block
 		// see https://bugs.eclipse.org/bugs/show_bug.cgi?id=237772
+	    // GROOVY start
+	    /* old {
 		mustSetToOriginalContent = !isPrimary() && (original = new CompilationUnit((PackageFragment)getParent(), getElementName(), DefaultWorkingCopyOwner.PRIMARY)).isOpen() ;
+	    } new */
+	    mustSetToOriginalContent = !isPrimary() && (original = LanguageSupportFactory.newCompilationUnit((PackageFragment)getParent(), getElementName(), DefaultWorkingCopyOwner.PRIMARY)).isOpen() ;
+	    // GROOVY end
 	}
 
 	// synchronize to ensure that 2 threads are not putting 2 different buffers at the same time

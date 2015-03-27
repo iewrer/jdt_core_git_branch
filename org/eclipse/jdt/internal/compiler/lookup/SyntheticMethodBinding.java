@@ -27,7 +27,7 @@ public class SyntheticMethodBinding extends MethodBinding {
 	public MethodBinding targetMethod;			// method or constructor
 	public TypeBinding targetEnumType; 			// enum type
 	public LambdaExpression lambda;
-	
+
 	public int purpose;
 
 	// fields used to generate enum constants when too many

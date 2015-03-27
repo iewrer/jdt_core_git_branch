@@ -1533,6 +1533,7 @@ public abstract class ASTVisitor {
 	public boolean visit(TryStatement node) {
 		return true;
 	}
+
 	/**
 	 * Visits the given type-specific AST node.
 	 * <p>
@@ -2708,6 +2709,7 @@ public abstract class ASTVisitor {
 	public void endVisit(TryStatement node) {
 		// default implementation: do nothing
 	}
+
 	/**
 	 * End of visit the given type-specific AST node.
 	 * <p>

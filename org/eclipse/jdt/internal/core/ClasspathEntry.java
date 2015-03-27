@@ -1563,7 +1563,7 @@ public class ClasspathEntry implements IClasspathEntry {
 			}
 		}
 		return null;
-	}
+	}	
 
 	public boolean ignoreOptionalProblems() {
 		if (this.entryKind == IClasspathEntry.CPE_SOURCE) {

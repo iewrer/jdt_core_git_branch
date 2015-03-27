@@ -38,6 +38,7 @@
  *								bug 412153 - [1.8][compiler] Check validity of annotations which may be repeatable
  *******************************************************************************/
 package org.eclipse.jdt.internal.compiler.lookup;
+// GROOVY PATCHED
 
 import java.util.Arrays;
 import java.util.Comparator;
@@ -337,6 +338,11 @@ public boolean canBeSeenBy(ReferenceBinding receiverType, ReferenceBinding invoc
  * Answer true if the receiver is visible to the type provided by the scope.
  */
 public boolean canBeSeenBy(Scope scope) {
+	// GROOVY start
+	if (scope.compilationUnitScope()!=null && scope.compilationUnitScope().canSeeEverything()) {
+		return true;
+	}
+	// GROOVY end
 	if (isPublic()) return true;
 
 	SourceTypeBinding invocationType = scope.enclosingSourceType();
@@ -443,7 +449,7 @@ public void computeId() {
 						case 'a':
 							if (CharOperation.equals(TypeConstants.JAVAX_ANNOTATION_INJECT_INJECT, this.compoundName))
 								this.id = TypeIds.T_JavaxInjectInject;
-							return;
+				return;
 						case 'u':
 							if (CharOperation.equals(TypeConstants.JUNIT_FRAMEWORK_ASSERT, this.compoundName))
 								this.id = TypeIds.T_JunitFrameworkAssert;
@@ -453,7 +459,7 @@ public void computeId() {
 				default: return;
 			}
 			// ... at this point we know it's java.*.*
-			
+
 			packageName = this.compoundName[1];
 			if (packageName.length == 0) return; // just to be safe
 			char[] typeName = this.compoundName[2];
@@ -524,9 +530,9 @@ public void computeId() {
 							}
 							return;
 						case 14:
-							if (CharOperation.equals(typeName, TypeConstants.JAVA_LANG_ASSERTIONERROR[2]))
-								this.id = TypeIds.T_JavaLangAssertionError;
-							return;
+					if (CharOperation.equals(typeName, TypeConstants.JAVA_LANG_ASSERTIONERROR[2]))
+						this.id = TypeIds.T_JavaLangAssertionError;
+					return;
 					}
 					return;
 				case 'B' :
@@ -768,33 +774,33 @@ public void computeId() {
 			packageName = this.compoundName[0];
 			switch (packageName[0]) {
 				case 'j' :
-					if (!CharOperation.equals(TypeConstants.JAVA, this.compoundName[0]))
-						return;
-					packageName = this.compoundName[1];
-					if (packageName.length == 0) return; // just to be safe
-					
-					if (CharOperation.equals(TypeConstants.LANG, packageName)) {
-						packageName = this.compoundName[2];
-						if (packageName.length == 0) return; // just to be safe
-						switch (packageName[0]) {
-							case 'i' :
-								if (CharOperation.equals(packageName, TypeConstants.INVOKE)) { 
-									typeName = this.compoundName[3];
-									if (typeName.length == 0) return; // just to be safe
-									switch (typeName[0]) {
-										case 'M' :
-											char[] memberTypeName = this.compoundName[4];
-											if (memberTypeName.length == 0) return; // just to be safe
-											if (CharOperation.equals(typeName, TypeConstants.JAVA_LANG_INVOKE_METHODHANDLE_POLYMORPHICSIGNATURE[3])
-													&& CharOperation.equals(memberTypeName, TypeConstants.JAVA_LANG_INVOKE_METHODHANDLE_POLYMORPHICSIGNATURE[4]))
-												this.id = TypeIds.T_JavaLangInvokeMethodHandlePolymorphicSignature;
-											return;
-									}
-								}
-								return;
+			if (!CharOperation.equals(TypeConstants.JAVA, this.compoundName[0]))
+				return;
+			packageName = this.compoundName[1];
+			if (packageName.length == 0) return; // just to be safe
+
+			if (CharOperation.equals(TypeConstants.LANG, packageName)) {
+				packageName = this.compoundName[2];
+				if (packageName.length == 0) return; // just to be safe
+				switch (packageName[0]) {
+					case 'i' :
+						if (CharOperation.equals(packageName, TypeConstants.INVOKE)) { 
+							typeName = this.compoundName[3];
+							if (typeName.length == 0) return; // just to be safe
+							switch (typeName[0]) {
+								case 'M' :
+									char[] memberTypeName = this.compoundName[4];
+									if (memberTypeName.length == 0) return; // just to be safe
+									if (CharOperation.equals(typeName, TypeConstants.JAVA_LANG_INVOKE_METHODHANDLE_POLYMORPHICSIGNATURE[3])
+											&& CharOperation.equals(memberTypeName, TypeConstants.JAVA_LANG_INVOKE_METHODHANDLE_POLYMORPHICSIGNATURE[4]))
+										this.id = TypeIds.T_JavaLangInvokeMethodHandlePolymorphicSignature;
+									return;
+							}
 						}
 						return;
-					}
+				}
+				return;
+	}
 					return;
 				case 'o':
 					if (!CharOperation.equals(TypeConstants.ORG, this.compoundName[0]))
@@ -804,29 +810,29 @@ public void computeId() {
 
 					switch (packageName[0]) {
 						case 'e':
-							if (CharOperation.equals(TypeConstants.ECLIPSE, packageName)) {
-								packageName = this.compoundName[2];
-								if (packageName.length == 0) return; // just to be safe
-								switch (packageName[0]) {
-									case 'c' :
-										if (CharOperation.equals(packageName, TypeConstants.CORE)) { 
-											typeName = this.compoundName[3];
-											if (typeName.length == 0) return; // just to be safe
-											switch (typeName[0]) {
-												case 'r' :
-													char[] memberTypeName = this.compoundName[4];
-													if (memberTypeName.length == 0) return; // just to be safe
-													if (CharOperation.equals(typeName, TypeConstants.ORG_ECLIPSE_CORE_RUNTIME_ASSERT[3])
-															&& CharOperation.equals(memberTypeName, TypeConstants.ORG_ECLIPSE_CORE_RUNTIME_ASSERT[4]))
-														this.id = TypeIds.T_OrgEclipseCoreRuntimeAssert;
-													return;
-											}
-										}
-										return;
+					if (CharOperation.equals(TypeConstants.ECLIPSE, packageName)) {
+						packageName = this.compoundName[2];
+						if (packageName.length == 0) return; // just to be safe
+						switch (packageName[0]) {
+							case 'c' :
+								if (CharOperation.equals(packageName, TypeConstants.CORE)) { 
+									typeName = this.compoundName[3];
+									if (typeName.length == 0) return; // just to be safe
+									switch (typeName[0]) {
+										case 'r' :
+											char[] memberTypeName = this.compoundName[4];
+											if (memberTypeName.length == 0) return; // just to be safe
+											if (CharOperation.equals(typeName, TypeConstants.ORG_ECLIPSE_CORE_RUNTIME_ASSERT[3])
+													&& CharOperation.equals(memberTypeName, TypeConstants.ORG_ECLIPSE_CORE_RUNTIME_ASSERT[4]))
+												this.id = TypeIds.T_OrgEclipseCoreRuntimeAssert;
+											return;
+									}
 								}
 								return;
-							}
-							return;
+						}
+						return;
+					}
+					return;
 						case 'a':
 							if (CharOperation.equals(TypeConstants.APACHE, packageName)) {
 								if (CharOperation.equals(TypeConstants.COMMONS, this.compoundName[2])) {
@@ -837,7 +843,7 @@ public void computeId() {
 								}
 							}
 							return;
-					}
+			}
 					return;
 				case 'c':
 					if (!CharOperation.equals(TypeConstants.COM, this.compoundName[0]))
@@ -1831,7 +1837,6 @@ MethodBinding[] unResolvedMethods() { // for the MethodVerifier so it doesn't re
 public FieldBinding[] unResolvedFields() {
 	return Binding.NO_FIELDS;
 }
-
 /*
  * If a type - known to be a Closeable - is mentioned in one of our white lists
  * answer the typeBit for the white list (BitWrapperCloseable or BitResourceFreeCloseable).
@@ -1877,6 +1882,12 @@ protected int applyCloseableClassWhitelists() {
 	}	
 	return 0;
 }
+// GROOVY start
+// more thought required - is this in the right place?
+public MethodBinding[] getAnyExtraMethods(char[] selector) {
+	return null;
+}
+// GROOVY end
 
 
 /*

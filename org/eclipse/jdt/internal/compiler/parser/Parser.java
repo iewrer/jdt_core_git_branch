@@ -26,6 +26,7 @@
  *                          Bug 415821 - [1.8][compiler] CLASS_EXTENDS target type annotation missing for anonymous classes
  *******************************************************************************/
 package org.eclipse.jdt.internal.compiler.parser;
+// GROOVY PATCHED
 
 import java.io.BufferedInputStream;
 import java.io.BufferedWriter;
@@ -10665,6 +10666,9 @@ public void initializeScanner(){
 		this.options.taskTags/*taskTags*/,
 		this.options.taskPriorities/*taskPriorities*/,
 		this.options.isTaskCaseSensitive/*taskCaseSensitive*/);
+	// GROOVY start - workaround JDT bug where it sorts the tasks but not the priorities!
+	this.options.taskPriorities = scanner.taskPriorities;
+	// GROOVY end
 }
 public void jumpOverMethodBody() {
 	//on diet parsing.....do not buffer method statements
@@ -12506,10 +12510,14 @@ protected void updateSourcePosition(Expression exp) {
 	exp.sourceEnd = this.intStack[this.intPtr--];
 	exp.sourceStart = this.intStack[this.intPtr--];
 }
+// GROOVY start: new method where parser resetting can be done
+public void reset() {
+	// standard Java parser, nothing to do
+}
+// GROOVY end
 public void copyState(Parser from) {
 	
 	Parser parser = from;
-
 	// Stack pointers.
 	
 	this.stateStackTop = parser.stateStackTop;
@@ -12554,19 +12562,17 @@ public void copyState(Parser from) {
 	System.arraycopy(parser.stack, 0, this.stack = new int [length = parser.stack.length], 0, length);
 	System.arraycopy(parser.stack, 0, this.stack = new int [length = parser.stack.length], 0, length);
 	System.arraycopy(parser.stack, 0, this.stack = new int [length = parser.stack.length], 0, length);
-
+public void reset() {
 	// Loose variables.
 	
 	this.listLength = parser.listLength;
 	this.listTypeParameterLength = parser.listTypeParameterLength;
 	this.dimensions = parser.dimensions;
 	this.recoveredStaticInitializerStart = parser.recoveredStaticInitializerStart;
-
 	// Parser.resetStacks is not clearing the modifiers, but AssistParser.resumeAfterRecovery is - why ? (the former doesn't)
 	// this.modifiers = parser.modifiers;
 	// this.modifiersSourceStart = parser.modifiersSourceStart;
 }
-
 public int automatonState() {
 	return this.stack[this.stateStackTop];
 }

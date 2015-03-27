@@ -2696,8 +2696,8 @@ public class Util {
 			}
 			signature = Signature.createIntersectionTypeSignature(typeSignatures);
 		} else {
-			char[][] compoundName = type.getParameterizedTypeName();
-			char[] typeName =CharOperation.concatWith(compoundName, '.');
+		char[][] compoundName = type.getParameterizedTypeName();
+		char[] typeName =CharOperation.concatWith(compoundName, '.');
 			signature = Signature.createTypeSignature(typeName, false/*don't resolve*/);
 		}
 		return signature;
